@@ -28,10 +28,11 @@ def main():
                  )
         
         with col2:
-            df = db.get_collection_data(collection_selected, dataframe=True)
+            if collection_selected:
+                df = db.get_collection_data(collection_selected, dataframe=True)
 
-            st.markdown(f"<b>Selected Collection </b>*{collection_selected}*", unsafe_allow_html=True)
-            st.dataframe(df, use_container_width=True, height=300)
+                st.markdown(f"<b>Selected Collection </b>*{collection_selected}*", unsafe_allow_html=True)
+                st.dataframe(df, use_container_width=True, height=300)
         
         st.divider()
 
