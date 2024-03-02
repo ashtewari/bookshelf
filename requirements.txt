@@ -1,4 +1,6 @@
 streamlit
 pandas
 chromadb
-dotenv
+python-dotenv
+llama-index
+llama-index-embeddings-huggingface
