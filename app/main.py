@@ -44,9 +44,7 @@ def main():
             result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
         
             st.dataframe(result_df, use_container_width=True)
-
-main()
-    
+            
 if __name__ == "__main__":
 
     working_dir = os.path.dirname(os.path.abspath(__file__))
