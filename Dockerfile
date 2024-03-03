@@ -7,8 +7,7 @@ COPY requirements.txt /build/
 
 # Install dependencies
 RUN pip install -r /build/requirements.txt
-RUN pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-RUN pip install llama-index --upgrade --no-cache-dir --force-reinstall
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
 # Copy the rest of the app's code
 COPY . /build
