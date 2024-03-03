@@ -9,4 +9,4 @@ streamlit run app/main.py
 # Build the Docker image
 docker build -t bookshelf .
 # Run the Docker container
-docker run -v c:\data\:/app/data -p 8501:8501 bookshelf
+docker run -v c:\data\:/app/data -p 8501:8501 bookshelf 

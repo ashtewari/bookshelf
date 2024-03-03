@@ -5,6 +5,7 @@ import pandas as pd
 from dotenv import load_dotenv, find_dotenv
 from src.viewer import ChromaDb
 import tempfile
+from src.loader import Loader
 
 load_dotenv(find_dotenv()) 
 
@@ -24,6 +25,9 @@ def main():
         with open(tempFilePath, "wb") as f:
                 f.write(uploaded_file.getvalue())       
         st.write(f"Selected file: {tempFilePath}")
+
+        loader = Loader(path)
+        loader.load(tempFilePath, uploaded_file.file_id)
     
     st.divider()
 
