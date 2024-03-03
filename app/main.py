@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 from dotenv import load_dotenv, find_dotenv
 from src.viewer import ChromaDb
+import tempfile
 
 load_dotenv(find_dotenv()) 
 
@@ -15,6 +16,15 @@ def main():
     last_used_path = os.environ['MBED:SelectedDatabasePath']
     path = st.text_input("Database", placeholder="Full path to database directory", value=last_used_path)
 
+    uploaded_file = st.file_uploader("Choose a file")
+    if uploaded_file is not None:
+           
+        temp_dir = tempfile.mkdtemp()
+        tempFilePath = os.path.join(temp_dir, uploaded_file.name)
+        with open(tempFilePath, "wb") as f:
+                f.write(uploaded_file.getvalue())       
+        st.write(f"Selected file: {tempFilePath}")
+    
     st.divider()
 
     if not(path==""):
