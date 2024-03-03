@@ -29,11 +29,12 @@ class Loader:
     def __init__(self, dbPath):
         self.dbPath = dbPath
 
-        # Set the CUDA device
-        torch.cuda.set_device(0)
-
         # Check if CUDA is available
         if torch.cuda.is_available():
+
+            # Set the CUDA device
+            torch.cuda.set_device(0)
+            
             # Get the current device
             device = torch.cuda.device(device=0)
 
