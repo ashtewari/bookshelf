@@ -11,9 +11,9 @@ from src.loader import Loader
 load_dotenv(find_dotenv()) 
 
 def main():
-    st.set_page_config(page_title="bookshelf", page_icon="📚", layout="wide")
+    st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
 
-    st.title("bookshelf", "📚")
+    st.title("Bookshelf", "📚")
 
     preferred_data_path = None
     if 'Bookshelf:PreferredDataPath' in os.environ:
@@ -55,7 +55,7 @@ def main():
         st.divider()
 
         query = st.text_input("Find similar text", placeholder="Enter text to search")
-        model_name = st.text_input("Enter Embedding Model Name", placeholder="all-MiniLM-L6-v2")
+        model_name = st.text_input("Enter Embedding Model Name", placeholder="all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
         result_count = st.number_input("Enter number of documents to find", value=5, format='%d', step=1)
         if query:
             if result_count == '':
