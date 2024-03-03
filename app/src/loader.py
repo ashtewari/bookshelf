@@ -46,7 +46,7 @@ class Loader:
 
         print(torch.cuda.is_available())        
 
-    def load(self, filePath, collectionName):   
+    def load(self, filePath, collectionName, modelName):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
         llm = OpenAI(temperature=0.1, model_name="gpt-3.5-turbo", max_tokens=512)
@@ -54,7 +54,7 @@ class Loader:
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         transformations = [text_splitter]
         pipeline = IngestionPipeline(transformations=transformations)
-        embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-mpnet-base-v2")
+        embed_model = HuggingFaceEmbedding(model_name=modelName)
         db = chromadb.PersistentClient(path=self.dbPath)
         chroma_collection = db.get_or_create_collection(collectionName)
 

@@ -19,9 +19,10 @@ def main():
     if 'Bookshelf:PreferredDataPath' in os.environ:
         preferred_data_path = os.environ['Bookshelf:PreferredDataPath']
 
-    data_path = st.text_input("Database", placeholder="Full path to database directory", value=preferred_data_path or "data")
+    data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path or "data")
+    model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
 
-    uploaded_file = st.file_uploader("Choose a file")
+    uploaded_file = st.file_uploader("Choose File")
     if uploaded_file is not None:
            
         temp_dir = tempfile.mkdtemp()
@@ -31,7 +32,7 @@ def main():
         st.write(f"Selected file: {tempFilePath}")
 
         loader = Loader(data_path)
-        loader.load(tempFilePath, generate_valid_collection_name(uploaded_file.name))
+        loader.load(tempFilePath, generate_valid_collection_name(uploaded_file.name), model_name)
     
     st.divider()
 
@@ -55,8 +56,7 @@ def main():
         st.divider()
 
         query = st.text_input("Find similar text", placeholder="Enter text to search")
-        model_name = st.text_input("Enter Embedding Model Name", placeholder="all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
-        result_count = st.number_input("Enter number of documents to find", value=5, format='%d', step=1)
+        result_count = st.number_input("Number of documents to find", value=5, format='%d', step=1)
         if query:
             if result_count == '':
                 result_count = 5  # Set a default value if result_count is empty
