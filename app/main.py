@@ -7,6 +7,7 @@ from dotenv import load_dotenv, find_dotenv
 from src.viewer import ChromaDb
 import tempfile
 from src.loader import Loader
+from openai import OpenAI
 
 load_dotenv(find_dotenv()) 
 
@@ -62,7 +63,22 @@ def main():
                 result_count = 5  # Set a default value if result_count is empty
             result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
         
-            st.dataframe(result_df, use_container_width=True)   
+            st.dataframe(result_df, use_container_width=True)
+        
+            context = result_df['documents'].to_list()
+            prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
+            st.text_area(key="txtLlmResponse", label=query, value=get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2))   
+
+def get_completion(prompt, model="gpt-3.5-turbo", temperature=0): 
+    messages = [{"role": "user", "content": prompt}]
+    client = OpenAI()
+    client.api_key = os.getenv('OPENAI_API_KEY')
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+    )
+    return response.choices[0].message.content
 
 def generate_valid_collection_name(input):
     #Expected collection name that 
