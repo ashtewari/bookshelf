@@ -16,6 +16,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.core.text_splitter import TokenTextSplitter
 from llama_index.core.ingestion import IngestionPipeline
+from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -30,6 +31,7 @@ class Loader:
         self.dbPath = dbPath
 
         # Check if CUDA is available
+        print(f'CUDA is available: {torch.cuda.is_available()}')  
         if torch.cuda.is_available():
 
             # Set the CUDA device
@@ -39,12 +41,10 @@ class Loader:
             device = torch.cuda.device(device=0)
 
             # Create a tensor on the GPU
-            tensor = torch.cuda.FloatTensor([1, 2, 3])
+            tensor = torch.tensor([1, 2, 3])
 
             # Print the tensor
-            print(tensor)
-
-        print(torch.cuda.is_available())        
+            print(tensor)      
 
     def load(self, filePath, collectionName, modelName):   
 
@@ -54,7 +54,13 @@ class Loader:
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         transformations = [text_splitter]
         pipeline = IngestionPipeline(transformations=transformations)
-        embed_model = HuggingFaceEmbedding(model_name=modelName)
+        embed_model = HuggingFaceEmbeddings(
+            model_name=modelName, 
+            model_kwargs={"device": "cuda"},
+            # Use GPU for embedding and specify a large enough batch size to maximize GPU utilization.
+            # Remove the "device": "cuda" to use CPU instead.
+            encode_kwargs={"device": "cuda", "batch_size": 100}
+            )        
         db = chromadb.PersistentClient(path=self.dbPath)
         chroma_collection = db.get_or_create_collection(collectionName)
 
