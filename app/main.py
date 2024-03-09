@@ -40,6 +40,8 @@ def main():
     if not(data_path==""):
         db = ChromaDb(data_path)
 
+        st.button("Delete collection", on_click=lambda: db.delete_collection(collection_selected))
+
         col1, col2 = st.columns([1,3])
         with col1:
             collection_selected=st.radio("Collections",

@@ -40,3 +40,6 @@ class ChromaDb:
         if dataframe:
             return pd.DataFrame(out)
         return out
+    
+    def delete_collection(self, collection_name):
+        self.client.delete_collection(name=collection_name)
