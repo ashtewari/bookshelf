@@ -74,6 +74,7 @@ def main():
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0): 
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
+    client.base_url = os.getenv('OPENAI_API_URL')
     client.api_key = os.getenv('OPENAI_API_KEY')
     response = client.chat.completions.create(
         model=model,

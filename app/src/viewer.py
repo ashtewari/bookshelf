@@ -29,7 +29,7 @@ class ChromaDb:
         embed_model = HuggingFaceEmbedding(model_name=model_name)
         embedding = embed_model.get_text_embedding(query_str)
         res = collection.query(
-            query_embeddings=[embedding], n_results=min(k, len(collection.get()))
+            query_embeddings=[embedding], n_results=k
         )
         out = {}
         for key, value in res.items():
