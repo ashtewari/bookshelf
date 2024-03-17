@@ -8,8 +8,10 @@ from src.viewer import ChromaDb
 import tempfile
 from src.loader import Loader
 from openai import OpenAI
+import pandas as pd
+import json
 
-load_dotenv(find_dotenv()) 
+load_dotenv(find_dotenv(), override=True) 
 
 def main():
     st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
@@ -22,6 +24,7 @@ def main():
 
     data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path or "data")
     model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
+    collection_name = st.text_input("Collection Name", placeholder=os.path.basename(model_name))
 
     uploaded_file = st.file_uploader("Choose File")
     if uploaded_file is not None:
@@ -33,7 +36,8 @@ def main():
         st.write(f"Selected file: {tempFilePath}")
 
         loader = Loader(data_path)
-        loader.load(tempFilePath, generate_valid_collection_name(uploaded_file.name), model_name)
+        collection_name = collection_name or os.path.basename(model_name)
+        loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name)
     
     st.divider()
 
@@ -66,6 +70,8 @@ def main():
             result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
         
             st.dataframe(result_df, use_container_width=True)
+            result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
+            st.table(pd.json_normalize(result_df['metadatas'].head(3))['file_name'].apply(lambda x: os.path.basename(x)).drop_duplicates().to_list())
         
             context = result_df['documents'].to_list()
             prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
@@ -112,4 +118,3 @@ if __name__ == "__main__":
     sys.path.append(working_dir)
 
     main()
-    
