@@ -71,16 +71,18 @@ def main():
         
             st.dataframe(result_df, use_container_width=True)
             result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
-            st.table(pd.json_normalize(result_df['metadatas'].head(3))['file_name'].apply(lambda x: os.path.basename(x)).drop_duplicates().to_list())
+            result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))
+            result_df['page_label'] = pd.json_normalize(result_df['metadatas'])['page_label']
+            st.table(result_df.groupby('file_name')['page_label'].apply(list))
         
-            context = result_df['documents'].to_list()
+            context = result_df['documents'].to_list() 
             prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
             st.text_area(key="txtLlmResponse", label=query, value=get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2))   
 
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0): 
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
-    client.base_url = os.getenv('OPENAI_API_URL')
+    client.base_url = os.getenv('OPENAI_API_URL') 
     client.api_key = os.getenv('OPENAI_API_KEY')
     response = client.chat.completions.create(
         model=model,
