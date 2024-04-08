@@ -25,52 +25,61 @@ def main():
     if 'OPENAI_API_TIMEOUT' in os.environ:
         timeout = os.getenv('OPENAI_API_TIMEOUT')        
 
+    collection_selected = st.session_state.collections if 'collections' in st.session_state else None
     data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path or "data")
     model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
-    collection_name = st.text_input("Collection Name", placeholder=os.path.basename(model_name))
+    collection_name = st.text_input("Collection Name", value=collection_selected or "default")
 
-    uploaded_file = st.file_uploader("Choose File")
-    if uploaded_file is not None:
+    uploaded_file = None
+    submitted = False
+    with st.form("frmFileUploader", clear_on_submit=True):
+        uploaded_file = st.file_uploader("Choose File")
+        submitted = st.form_submit_button("Upload File")
+    if submitted and uploaded_file is not None:
            
         temp_dir = tempfile.mkdtemp()
         tempFilePath = os.path.join(temp_dir, uploaded_file.name)
         with open(tempFilePath, "wb") as f:
                 f.write(uploaded_file.getvalue())       
-        st.write(f"Selected file: {tempFilePath}")
+        print(f"Selected file: {tempFilePath}")
 
         loader = Loader(data_path)
         collection_name = collection_name or os.path.basename(model_name)
-        loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name, timeout=timeout)
-    
-    st.divider()
+        with st.spinner(f"Uploading {uploaded_file.name} to {collection_name}"):
+            loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name, timeout=timeout)
 
     if not(data_path==""):
         db = ChromaDb(data_path)
-
-        st.button("Delete collection", on_click=lambda: db.delete_collection(collection_selected))
-
+  
+        with st.spinner("Loading collections..."):
+            collections = db.get_collections()
+        collection_index = collections.index(collection_name) if collection_name in collections else 0
         col1, col2 = st.columns([1,3])
         with col1:
-            collection_selected=st.radio("Collections",
-                 options=db.get_collections(),
-                 index=0,
+            collection_selected=st.radio("Collections", key="collections",
+                 options=collections,
+                 index=collection_index,
+                 on_change=lambda : st.session_state.update(txtFindText=None)
                  )
         
         with col2:
             if collection_selected:
-                df = db.get_collection_data(collection_selected, dataframe=True)
-
-                st.markdown(f"<b>Selected Collection </b>*{collection_selected}*", unsafe_allow_html=True)
-                st.dataframe(df, use_container_width=True, height=300)
+                with st.spinner(f"Loading {collection_selected}..."):
+                    df = db.get_collection_data(collection_selected, dataframe=True)
+                    st.markdown(f"<b>Selected Collection </b>*{collection_selected}*", unsafe_allow_html=True)
+                    st.dataframe(df, use_container_width=True, height=300)
         
+        st.button(f"Delete selected collection: {collection_selected}", on_click=lambda: db.delete_collection(collection_selected))
         st.divider()
 
-        query = st.text_input("Find similar text", placeholder="Enter text to search")
+        query = st.text_input("Find similar text", key="txtFindText", placeholder="Enter text to search")
         result_count = st.number_input("Number of documents to find", value=5, format='%d', step=1)
         if query:
             if result_count == '':
                 result_count = 5  # Set a default value if result_count is empty
-            result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
+
+            with st.spinner(f"Searching for simmilar documents ..."):
+                result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
         
             st.dataframe(result_df, use_container_width=True)
             result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
@@ -80,7 +89,11 @@ def main():
         
             context = result_df['documents'].to_list() 
             prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
-            st.text_area(key="txtLlmResponse", label=query, value=get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2, timeout=timeout))   
+            
+            with st.spinner("Thinking ..."):
+                llm_response = get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2, timeout=timeout)
+            
+            st.text_area(key="txtLlmResponse", label=query, value=llm_response)   
 
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
     messages = [{"role": "user", "content": prompt}]
