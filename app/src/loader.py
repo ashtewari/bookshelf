@@ -17,14 +17,18 @@ from llama_index.llms.openai import OpenAI
 from llama_index.core.text_splitter import TokenTextSplitter
 from llama_index.core.ingestion import IngestionPipeline
 from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+from llama_index.core.extractors import (
+    SummaryExtractor,
+    QuestionsAnsweredExtractor,
+    TitleExtractor,
+    KeywordExtractor,
+)
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
 
 os.environ['NUMEXPR_MAX_THREADS'] = '4'
 os.environ['NUMEXPR_NUM_THREADS'] = '2'
-
-openai.api_key=os.getenv("OPENAI_API_KEY")
 
 class Loader:
     def __init__(self, dbPath):
@@ -46,14 +50,21 @@ class Loader:
             # Print the tensor
             print(tensor)      
 
-    def load(self, filePath, collectionName, modelName):   
+    def load(self, filePath, collectionName, modelName, useExtractors=False, timeout=30):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
-        llm = OpenAI(temperature=0.1, model_name="gpt-3.5-turbo", max_tokens=512)
+        llm = OpenAI(temperature=0.1, model_name=modelName, max_tokens=512, timeout=timeout, 
+                     api_key=os.getenv("OPENAI_API_KEY"), 
+                     api_base=os.getenv('OPENAI_API_URL'))
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
-        transformations = [text_splitter]
-        pipeline = IngestionPipeline(transformations=transformations)
+        extractors=[
+            TitleExtractor(nodes=1, llm=llm, num_workers=1) #title is located on the first page, so pass 1 to nodes param
+            ,QuestionsAnsweredExtractor(questions=3, llm=llm, num_workers=1) #let's extract 3 questions for each node, you can customize this.
+            ,SummaryExtractor(summaries=["self"], llm=llm, num_workers=1) #let's extract the summary for both previous node and current node.
+            ,KeywordExtractor(keywords=10, llm=llm, num_workers=1) #let's extract 10 keywords for each node.
+        ]                
+        transformations = [text_splitter] + extractors if useExtractors else [text_splitter]
         embed_model = HuggingFaceEmbeddings(
             model_name=modelName, 
             model_kwargs={"device": "cuda"},
