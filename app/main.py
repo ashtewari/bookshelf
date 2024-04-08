@@ -76,7 +76,7 @@ def main():
             result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
             result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))
             result_df['page_label'] = pd.json_normalize(result_df['metadatas'])['page_label']
-            st.table(result_df.groupby('file_name')['page_label'].apply(list))
+            st.table(result_df.groupby('file_name')['page_label'].apply(list).apply(set).apply(sorted))
         
             context = result_df['documents'].to_list() 
             prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
