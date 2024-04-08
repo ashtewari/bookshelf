@@ -19,8 +19,11 @@ def main():
     st.title("Bookshelf", "📚")
 
     preferred_data_path = None
+    timeout = 30
     if 'Bookshelf:PreferredDataPath' in os.environ:
         preferred_data_path = os.environ['Bookshelf:PreferredDataPath']
+    if 'OPENAI_API_TIMEOUT' in os.environ:
+        timeout = os.getenv('OPENAI_API_TIMEOUT')        
 
     data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path or "data")
     model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
@@ -37,7 +40,7 @@ def main():
 
         loader = Loader(data_path)
         collection_name = collection_name or os.path.basename(model_name)
-        loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name)
+        loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name, timeout=timeout)
     
     st.divider()
 
@@ -77,13 +80,14 @@ def main():
         
             context = result_df['documents'].to_list() 
             prompt = f"CONTEXT = {context} Based on the CONTEXT provided above, {query}"
-            st.text_area(key="txtLlmResponse", label=query, value=get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2))   
+            st.text_area(key="txtLlmResponse", label=query, value=get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2, timeout=timeout))   
 
-def get_completion(prompt, model="gpt-3.5-turbo", temperature=0): 
+def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
     client.base_url = os.getenv('OPENAI_API_URL') 
     client.api_key = os.getenv('OPENAI_API_KEY')
+    client.timeout = timeout
     response = client.chat.completions.create(
         model=model,
         messages=messages,
