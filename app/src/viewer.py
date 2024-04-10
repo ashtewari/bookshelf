@@ -7,17 +7,19 @@ class ChromaDb:
         self.client = chromadb.PersistentClient(path)
 
     ## get list of collections
-    def get_collections(self):
+    def get_collections(self) -> list[dict]:
         collections = []
 
         for i in self.client.list_collections():
-            collections.append(i.name)
+            collections.append({"name": i.name, "count": i.count()})
         
         return collections
     
     ## get documents in specified collection
-    def get_collection_data(self, collection_name, dataframe=False):
-        data = self.client.get_collection(name=collection_name).get()
+    def get_collection_data(self, collection_name, dataframe=False, limit=10):
+        collection = self.client.get_collection(name=collection_name)
+        count = collection.count()
+        data = collection.get(limit=limit, offset=0)
         if dataframe:
             return pd.DataFrame(data)
         return data

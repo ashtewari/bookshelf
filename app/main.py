@@ -31,7 +31,7 @@ def main():
         st.error("Please provide a valid data path")
     
     model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
-    collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected or "default")
+    collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
     
     db = ChromaDb(data_path)    
     db.client.create_collection(collection_name, get_or_create=True)
@@ -59,23 +59,25 @@ def main():
       
     with st.spinner("Loading collections..."):
         collections = db.get_collections()
-    collection_index = collections.index(collection_name) if collection_name in collections else 0
+    names = {k for d in collections for k in d.keys()}
+    collection_index = collections.index(collection_name) if collection_name in names else 0
     col1, col2 = st.columns([1,3])
     with col1:
         collection_selected=st.radio("Collections", key="collections",
-                options=collections,
+                options=collections, format_func=lambda x: x['name'],
                 index=collection_index,
                 on_change=lambda : st.session_state.update(txtFindText=None)
                 )
     
     with col2:
         if collection_selected:
+            st.markdown(f"<b>Selected Collection : </b>*{collection_selected["name"]}*", unsafe_allow_html=True)
+            limit = st.slider('', 1, collection_selected["count"], 10)
             with st.spinner(f"Loading {collection_selected}..."):
-                df = db.get_collection_data(collection_selected, dataframe=True)
-                st.markdown(f"<b>Selected Collection </b>*{collection_selected}*", unsafe_allow_html=True)
+                df = db.get_collection_data(collection_selected["name"], dataframe=True, limit=limit)
                 st.dataframe(df, use_container_width=True, height=300)
     
-    st.button(f"Delete selected collection: {collection_selected}", on_click=lambda: db.delete_collection(collection_selected))
+    st.button(f"Delete selected collection: {collection_selected["name"]}", on_click=lambda: db.delete_collection(collection_selected["name"]))
     st.divider()
 
     query = st.text_input("Find similar text", key="txtFindText", placeholder="Enter text to search")
@@ -85,7 +87,7 @@ def main():
             result_count = 5  # Set a default value if result_count is empty
 
         with st.spinner(f"Searching for simmilar documents ..."):
-            result_df = db.query(query, collection_selected, model_name, int(result_count), dataframe=True)
+            result_df = db.query(query, collection_selected["name"], model_name, int(result_count), dataframe=True)
     
         st.dataframe(result_df, use_container_width=True)
         result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
