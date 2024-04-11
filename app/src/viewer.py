@@ -1,3 +1,4 @@
+import os
 import chromadb 
 import pandas as pd
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -23,6 +24,12 @@ class ChromaDb:
         if dataframe:
             return pd.DataFrame(data)
         return data
+    
+    def get_file_names(self, collection_name):
+        collection = self.client.get_collection(name=collection_name)
+        all_metadatas  = collection.get(include=["metadatas"]).get('metadatas')
+        distinct_keys = set([x.get('file_name') for x  in all_metadatas])
+        return {os.path.basename(x) for x in distinct_keys}
     
     ## query specified collection
     def query(self, query_str, collection_name, model_name, k=3, dataframe=False):

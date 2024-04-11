@@ -71,14 +71,13 @@ def main():
         st.button(f"Delete selected collection: {collection_selected["name"]}", on_click=lambda: db.delete_collection(collection_selected["name"]))
     with col2:         
         if collection_selected: 
-            limit = st.slider('Select nodes', 1, collection_selected["count"], 10, )
+            limit = st.slider('Nodes', 1, collection_selected["count"], 10, )
             with st.spinner(f"Loading {collection_selected}..."):
-                result_df = db.get_collection_data(collection_selected["name"], dataframe=True, limit=limit)                  
-                result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
-                result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))           
-                st.dataframe(result_df, use_container_width=True, height=300) 
-                st.dataframe(result_df['file_name'].drop_duplicates(), hide_index=True, use_container_width=True) 
-    
+                df = db.get_collection_data(collection_selected["name"], dataframe=True, limit=limit)
+                st.dataframe(df, use_container_width=True, height=300) 
+            with st.spinner(f"Loading {collection_selected}..."):
+                file_names = db.get_file_names(collection_selected["name"])          
+                st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
     st.divider()
 
     query = st.text_input("Find similar text", key="txtFindText", placeholder="Enter text to search")
