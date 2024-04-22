@@ -2,8 +2,6 @@ import logging
 import sys
 import os
 
-import openai
-
 import torch
 import torch.cuda
 
@@ -14,9 +12,9 @@ from llama_index.core import SimpleDirectoryReader,ServiceContext
 from llama_index.core import StorageContext
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.text_splitter import TokenTextSplitter
 from llama_index.core.ingestion import IngestionPipeline
-from langchain.embeddings.huggingface import HuggingFaceEmbeddings
 from llama_index.core.extractors import (
     SummaryExtractor,
     QuestionsAnsweredExtractor,
@@ -50,12 +48,14 @@ class Loader:
             # Print the tensor
             print(tensor)      
 
-    def load(self, filePath, collectionName, modelName, useExtractors=False, timeout=30):   
+    def load(self, filePath, collectionName, embeddingModelName, inferenceModelName, apiKey, apiBaseUrl, useExtractors=False, temperature=0.1, timeout=30):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
-        llm = OpenAI(temperature=0.1, model_name=modelName, max_tokens=512, timeout=timeout, 
-                     api_key=os.getenv("OPENAI_API_KEY"), 
-                     api_base=os.getenv('OPENAI_API_URL'))
+        llm = OpenAI(temperature=temperature, 
+                     model_name=inferenceModelName, 
+                     max_tokens=1024, timeout=timeout, 
+                     api_key=apiKey, 
+                     api_base=apiBaseUrl)
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         extractors=[
@@ -65,13 +65,15 @@ class Loader:
             ,KeywordExtractor(keywords=10, llm=llm, num_workers=1) #let's extract 10 keywords for each node.
         ]                
         transformations = [text_splitter] + extractors if useExtractors else [text_splitter]
-        embed_model = HuggingFaceEmbeddings(
-            model_name=modelName, 
-            model_kwargs={"device": "cuda"},
-            # Use GPU for embedding and specify a large enough batch size to maximize GPU utilization.
-            # Remove the "device": "cuda" to use CPU instead.
-            encode_kwargs={"device": "cuda", "batch_size": 100}
-            )        
+
+        if (embeddingModelName == "OpenAIEmbedding"):
+            embed_model = OpenAIEmbedding()
+        else:
+            embed_model = HuggingFaceEmbedding(
+                model_name=embeddingModelName,
+                embed_batch_size=100,
+                device='cuda' if torch.cuda.is_available() else 'cpu'
+                )        
         db = chromadb.PersistentClient(path=self.dbPath)
         chroma_collection = db.get_or_create_collection(collectionName)
 

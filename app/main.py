@@ -17,6 +17,7 @@ def main():
     st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
 
     st.title("Bookshelf", "📚")
+    configure_settings()
 
     preferred_data_path = None
     timeout = 30
@@ -25,12 +26,17 @@ def main():
     if 'OPENAI_API_TIMEOUT' in os.environ:
         timeout = os.getenv('OPENAI_API_TIMEOUT')        
 
-    collection_selected = st.session_state.collections if 'collections' in st.session_state else None
-    data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path or "data")
+    temp_dir = os.path.join(tempfile.gettempdir(), "bookshelf") 
+    app_user_data_path = os.path.join(temp_dir, os.path.join("data", "db"))        
+    data_path = app_user_data_path  
+ 
+    if(preferred_data_path is not None):
+        data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path)
+    
     if (data_path==""):
         st.error("Please provide a valid data path")
     
-    model_name = st.text_input("Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value="sentence-transformers/all-mpnet-base-v2")
+    collection_selected = st.session_state.collections if 'collections' in st.session_state else None
     collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
     
     db = ChromaDb(data_path)    
@@ -45,33 +51,39 @@ def main():
         submitted = st.form_submit_button("Upload File")
     if submitted and uploaded_file is not None:
            
-        temp_dir = tempfile.mkdtemp()
         tempFilePath = os.path.join(temp_dir, uploaded_file.name)
         with open(tempFilePath, "wb") as f:
                 f.write(uploaded_file.getvalue())       
         print(f"Selected file: {tempFilePath}")
 
         loader = Loader(data_path)
-        collection_name = collection_name or os.path.basename(model_name)
+        collection_name = collection_name or os.path.basename(st.session_state.embedding_model_name)
         with st.spinner(f"Uploading {uploaded_file.name} [{use_extractors}] to {collection_name}"):
-            loader.load(tempFilePath, generate_valid_collection_name(collection_name), model_name, useExtractors=use_extractors, timeout=timeout)
+            loader.load(filePath=tempFilePath
+                        , collectionName=generate_valid_collection_name(collection_name)
+                        , embeddingModelName=st.session_state.embedding_model_name
+                        , inferenceModelName=st.session_state.inference_model_name
+                        , apiKey=st.session_state.api_key
+                        , apiBaseUrl=st.session_state.api_url
+                        , useExtractors=use_extractors
+                        , temperature=0.1 
+                        , timeout=timeout)
             os.remove(tempFilePath)
       
     with st.spinner("Loading collections..."):
         collections = db.get_collections()
-    names = {k for d in collections for k in d.keys()}
-    collection_index = collections.index(collection_name) if collection_name in names else 0
+    names = [d['name'] for d in collections]
+    collection_index = names.index(collection_name) if collection_name in names else 0
     col1, col2 = st.columns([1,3])
     with col1:
         collection_selected=st.radio("Collections", key="collections",
                 options=collections, format_func=lambda x: x['name'],
                 index=collection_index,
-                on_change=lambda : st.session_state.update(txtFindText=None)
                 )
         st.button(f"Delete selected collection: {collection_selected["name"]}", on_click=lambda: db.delete_collection(collection_selected["name"]))
     with col2:         
         if collection_selected: 
-            limit = st.slider('Nodes', 1, collection_selected["count"], 10, )
+            limit = st.slider('Chunks', 1, collection_selected["count"], 10, )
             with st.spinner(f"Loading {collection_selected}..."):
                 df = db.get_collection_data(collection_selected["name"], dataframe=True, limit=limit)
                 st.dataframe(df, use_container_width=True, height=300) 
@@ -80,14 +92,19 @@ def main():
                 st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
     st.divider()
 
-    query = st.text_input("Find similar text", key="txtFindText", placeholder="Enter text to search")
-    result_count = st.number_input("Number of documents to find", value=5, format='%d', step=1)
-    if query:
+    query = st.text_input("Find similar text"
+                          , key="txtFindText"
+                          , placeholder="Enter text to search")
+    result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
+    with st.form(key="frmQuery", clear_on_submit=True, border=False):
+        submittedSearch = st.form_submit_button("Search")
+
+    if submittedSearch and query is not None and query != "":
         if result_count == '':
             result_count = 5  # Set a default value if result_count is empty
 
         with st.spinner(f"Searching for simmilar documents ..."):
-            result_df = db.query(query, collection_selected["name"], model_name, int(result_count), dataframe=True)
+            result_df = db.query(query, collection_selected["name"], st.session_state.embedding_model_name, int(result_count), dataframe=True)
     
         st.dataframe(result_df, use_container_width=True)
         result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
@@ -99,15 +116,39 @@ def main():
         prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {query}"
         
         with st.spinner("Thinking ..."):
-            llm_response = get_completion(prompt, model="gpt-3.5-turbo", temperature=0.2, timeout=timeout)
+            llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=0.2, timeout=timeout)
         
         st.text_area(key="txtLlmResponse", label=query, value=llm_response)   
+
+def configure_settings():
+    key_choice = st.sidebar.radio(label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
+
+    api_key = "not-needed"
+    api_url = "http://localhost:1234/v1"
+    embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
+    inference_model_name = "gpt-3.5-turbo"
+    
+    if key_choice == "OpenAI":
+        embedding_model_name = "OpenAIEmbedding"
+        api_url_value = "https://api.openai.com/v1"
+        inference_model_name = st.sidebar.text_input(key="txtInferenceModelName", label="Model Name", value=inference_model_name)               
+    elif key_choice == "Local":
+        api_url_value = "http://localhost:1234/v1"
+        embedding_model_name = st.sidebar.text_input(key="txtEmbeddingModelName", label="Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value=embedding_model_name)
+    
+    api_url = st.sidebar.text_input(key="txtApiUrl", label="LLM API Url", placeholder="https://api.openai.com/v1", value=api_url_value)
+    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('OPENAI_API_KEY') or "not-needed")
+    
+    st.session_state.api_key = api_key
+    st.session_state.api_url = api_url
+    st.session_state.embedding_model_name = embedding_model_name
+    st.session_state.inference_model_name = inference_model_name        
 
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
-    client.base_url = os.getenv('OPENAI_API_URL') 
-    client.api_key = os.getenv('OPENAI_API_KEY')
+    client.base_url = st.session_state.api_url 
+    client.api_key = st.session_state.api_key
     client.timeout = timeout
     response = client.chat.completions.create(
         model=model,
