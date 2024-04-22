@@ -48,7 +48,7 @@ def main():
     with st.form("frmFileUploader", clear_on_submit=True):
         uploaded_file = st.file_uploader("Choose File")
         use_extractors = st.radio("Extract additional metadata", options=[False, True], index=0, format_func=lambda x: "Yes" if x else "No")
-        submitted = st.form_submit_button("Upload File")
+        submitted = st.form_submit_button("Upload File", disabled=st.session_state.api_key_is_valid is False)
     if submitted and uploaded_file is not None:
            
         tempFilePath = os.path.join(temp_dir, uploaded_file.name)
@@ -97,7 +97,7 @@ def main():
                           , placeholder="Enter text to search")
     result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
     with st.form(key="frmQuery", clear_on_submit=True, border=False):
-        submittedSearch = st.form_submit_button("Search")
+        submittedSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
 
     if submittedSearch and query is not None and query != "":
         if result_count == '':
@@ -137,7 +137,12 @@ def configure_settings():
         embedding_model_name = st.sidebar.text_input(key="txtEmbeddingModelName", label="Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value=embedding_model_name)
     
     api_url = st.sidebar.text_input(key="txtApiUrl", label="LLM API Url", placeholder="https://api.openai.com/v1", value=api_url_value)
-    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('OPENAI_API_KEY') or "not-needed")
+    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('OPENAI_API_KEY') )
+    
+    st.session_state.api_key_is_valid = True
+    if key_choice == "OpenAI" and api_key == "":
+        st.sidebar.error("OpenAI API Key is required.")
+        st.session_state.api_key_is_valid = False
     
     st.session_state.api_key = api_key
     st.session_state.api_url = api_url
