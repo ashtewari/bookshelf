@@ -1,6 +1,6 @@
 streamlit==1.31.1
 pandas==2.2.1
-chromadb==0.4.24
+chromadb==0.3.29
 python-dotenv==1.0.1
 llama-index==0.10.15
 openai==1.13.3
