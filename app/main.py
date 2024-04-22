@@ -10,6 +10,8 @@ from src.loader import Loader
 from openai import OpenAI
 import pandas as pd
 import json
+import sys 
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 load_dotenv(find_dotenv(), override=True) 
 
