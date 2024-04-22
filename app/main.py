@@ -80,7 +80,7 @@ def main():
                 options=collections, format_func=lambda x: x['name'],
                 index=collection_index,
                 )
-        st.button(f"Delete selected collection: {collection_selected["name"]}", on_click=lambda: db.delete_collection(collection_selected["name"]))
+        st.button(f"Delete selected collection: {collection_selected['name']}", on_click=lambda: db.delete_collection(collection_selected["name"]))
     with col2:         
         if collection_selected: 
             limit = st.slider('Chunks', 1, collection_selected["count"], 10, )
