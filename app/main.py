@@ -133,6 +133,7 @@ def main():
 
 def configure_settings():
     if is_running_in_streamlit_cloud():
+        st.warning("Shared database for demo. Do not upload personal documents.")
         st.sidebar.header("OpenAI Settings")
         key_choice = "OpenAI"
     else:
