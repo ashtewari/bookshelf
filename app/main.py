@@ -110,7 +110,13 @@ def main():
             result_count = 5  # Set a default value if result_count is empty
 
         with st.spinner(f"Searching for similar documents ..."):
-            result_df = db.query(query, collection_selected["name"], st.session_state.embedding_model_name, int(result_count), dataframe=True)
+            result_df = db.query(query, collection_selected["name"]
+                                , apiKey=st.session_state.api_key
+                                , apiBaseUrl=st.session_state.api_url
+                                , timeout=int(timeout)                                  
+                                , embedding_model_name=st.session_state.embedding_model_name 
+                                , k = int(result_count)
+                                , dataframe=True)
     
         st.dataframe(result_df, use_container_width=True)
         result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
