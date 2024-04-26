@@ -4,14 +4,17 @@ import streamlit as st
 import uuid
 import re
 from dotenv import load_dotenv, find_dotenv
-from src.viewer import ChromaDb
 import tempfile
-from src.loader import Loader
 from openai import OpenAI
 import pandas as pd
 import json
-import sys 
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import platform
+if platform.system() == 'Linux':
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+from src.viewer import ChromaDb
+from src.loader import Loader
 
 load_dotenv(find_dotenv(), override=True) 
 
@@ -28,7 +31,7 @@ def main():
     if 'OPENAI_API_TIMEOUT' in os.environ:
         timeout = os.getenv('OPENAI_API_TIMEOUT')        
 
-    temp_dir = os.path.join(tempfile.gettempdir(), "bookshelf") 
+    temp_dir = os.path.join("tmp", "bookshelf") 
     app_user_data_path = os.path.join(temp_dir, os.path.join("data", "db"))        
     data_path = app_user_data_path  
  
@@ -69,7 +72,7 @@ def main():
                         , apiBaseUrl=st.session_state.api_url
                         , useExtractors=use_extractors
                         , temperature=0.1 
-                        , timeout=timeout)
+                        , timeout=int(timeout))
             os.remove(tempFilePath)
       
     with st.spinner("Loading collections..."):
@@ -94,7 +97,7 @@ def main():
                 st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
     st.divider()
 
-    query = st.text_input("Find similar text"
+    query = st.text_input("Find similar text chunks and query LLM"
                           , key="txtFindText"
                           , placeholder="Enter text to search")
     result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
@@ -105,7 +108,7 @@ def main():
         if result_count == '':
             result_count = 5  # Set a default value if result_count is empty
 
-        with st.spinner(f"Searching for simmilar documents ..."):
+        with st.spinner(f"Searching for similar documents ..."):
             result_df = db.query(query, collection_selected["name"], st.session_state.embedding_model_name, int(result_count), dataframe=True)
     
         st.dataframe(result_df, use_container_width=True)
@@ -142,9 +145,11 @@ def configure_settings():
     api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('OPENAI_API_KEY') )
     
     st.session_state.api_key_is_valid = True
-    if key_choice == "OpenAI" and api_key == "":
+    if key_choice == "OpenAI" and (api_key is None or api_key == ""):
         st.sidebar.error("OpenAI API Key is required.")
         st.session_state.api_key_is_valid = False
+    elif key_choice == "Local" and (api_key is None or api_key == ""):
+        api_key = "not-set"
     
     st.session_state.api_key = api_key
     st.session_state.api_url = api_url
@@ -155,8 +160,10 @@ def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30):
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
     client.base_url = st.session_state.api_url 
-    client.api_key = st.session_state.api_key
-    client.timeout = timeout
+    client.api_key = "not-set"
+    if (st.session_state.api_key is not None and st.session_state.api_key != ""):
+        client.api_key = st.session_state.api_key 
+    client.timeout = int(timeout)
     response = client.chat.completions.create(
         model=model,
         messages=messages,
