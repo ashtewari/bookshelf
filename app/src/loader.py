@@ -4,7 +4,7 @@ import os
 
 import torch
 import torch.cuda
-
+import openai
 import chromadb
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.chroma import ChromaVectorStore
@@ -51,11 +51,12 @@ class Loader:
     def load(self, filePath, collectionName, embeddingModelName, inferenceModelName, apiKey, apiBaseUrl, useExtractors=False, temperature=0.1, timeout=30):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
-        llm = OpenAI(temperature=temperature, 
-                     model_name=inferenceModelName, 
-                     max_tokens=1024, timeout=timeout, 
-                     api_key=apiKey, 
-                     api_base=apiBaseUrl)
+        openai.api_key = apiKey
+        openai.api_base = apiBaseUrl
+        openai.timeout = timeout
+        openai.max_tokens = 1024
+        openai.temperature = temperature
+        llm = OpenAI(model_name=inferenceModelName)
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         extractors=[

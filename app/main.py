@@ -128,7 +128,6 @@ def main():
 def configure_settings():
     key_choice = st.sidebar.radio(label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
 
-    api_key = "not-needed"
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
     inference_model_name = "gpt-3.5-turbo"
@@ -142,7 +141,7 @@ def configure_settings():
         embedding_model_name = st.sidebar.text_input(key="txtEmbeddingModelName", label="Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value=embedding_model_name)
     
     api_url = st.sidebar.text_input(key="txtApiUrl", label="LLM API Url", placeholder="https://api.openai.com/v1", value=api_url_value)
-    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('OPENAI_API_KEY') )
+    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password")
     
     st.session_state.api_key_is_valid = True
     if key_choice == "OpenAI" and (api_key is None or api_key == ""):
@@ -160,9 +159,7 @@ def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30):
     messages = [{"role": "user", "content": prompt}]
     client = OpenAI()
     client.base_url = st.session_state.api_url 
-    client.api_key = "not-set"
-    if (st.session_state.api_key is not None and st.session_state.api_key != ""):
-        client.api_key = st.session_state.api_key 
+    client.api_key = st.session_state.api_key 
     client.timeout = int(timeout)
     response = client.chat.completions.create(
         model=model,
