@@ -133,6 +133,7 @@ def main():
 
 def configure_settings():
     if is_running_in_streamlit_cloud():
+        st.sidebar.header("OpenAI Settings")
         key_choice = "OpenAI"
     else:
         key_choice = st.sidebar.radio(key="rdOptions", label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
