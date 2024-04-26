@@ -4,7 +4,6 @@ import streamlit as st
 import uuid
 import re
 from dotenv import load_dotenv, find_dotenv
-import tempfile
 from openai import OpenAI
 import pandas as pd
 import json
@@ -168,9 +167,8 @@ def configure_settings():
 
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
     messages = [{"role": "user", "content": prompt}]
-    client = OpenAI()
+    client = OpenAI(api_key = st.session_state.api_key)
     client.base_url = st.session_state.api_url 
-    client.api_key = st.session_state.api_key 
     client.timeout = int(timeout)
     response = client.chat.completions.create(
         model=model,
