@@ -17,6 +17,7 @@ from src.viewer import ChromaDb
 from src.loader import Loader
 
 load_dotenv(find_dotenv(), override=True) 
+# os.environ['OPENAI_API_KEY'] = ""
 
 def main():
     st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
@@ -126,7 +127,11 @@ def main():
         st.text_area(key="txtLlmResponse", label=query, value=llm_response)   
 
 def configure_settings():
-    key_choice = st.sidebar.radio(label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
+    if os.getenv('HTTP_HOST') == "share.streamlit.io":
+        key_choice = "OpenAI"
+    else:
+        key_choice = st.sidebar.radio(key="rdOptions", label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
+        
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
