@@ -127,7 +127,7 @@ def main():
         st.text_area(key="txtLlmResponse", label=query, value=llm_response)   
 
 def configure_settings():
-    if os.getenv('HTTP_HOST') == "share.streamlit.io":
+    if is_running_in_streamlit_cloud():
         key_choice = "OpenAI"
     else:
         key_choice = st.sidebar.radio(key="rdOptions", label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
@@ -195,7 +195,15 @@ def generate_valid_collection_name(input):
     result =  result[0:63].lower()
     
     return result 
-         
+
+def is_running_in_streamlit_cloud():
+  """Returns True if the code is running in Streamlit Cloud, False otherwise."""
+
+  if platform.processor():
+    return False
+  else:
+    return True
+           
 if __name__ == "__main__":
 
     working_dir = os.path.dirname(os.path.abspath(__file__))
