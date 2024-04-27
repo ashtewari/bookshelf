@@ -22,7 +22,11 @@ def main():
     st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
 
     st.title("Bookshelf", "📚")
-    configure_settings()
+
+    configure_demo_mode()
+    print(f"Demo mode: {st.session_state.demo_mode}") 
+
+    configure_settings(st.session_state.demo_mode)
 
     preferred_data_path = None
     timeout = 30
@@ -50,21 +54,27 @@ def main():
     uploaded_file = None
     submitted = False
     use_extractors = False
+    use_extractors = st.radio(key="rdUseExtractors", label="Extract additional metadata when loading files?", 
+                                options=[False, True], index=0, horizontal=True, 
+                                format_func=lambda x: "Yes" if x else "No")    
+    if "rdUseExtractors" in st.session_state and st.session_state.rdUseExtractors == True:
+        st.warning("WARNING: Metadata extraction uses LLM and may incur additional costs.") 
+    
     with st.form("frmFileUploader", clear_on_submit=True):
-        uploaded_file = st.file_uploader("Choose File")
-        use_extractors = st.radio("Extract additional metadata", options=[False, True], index=0, format_func=lambda x: "Yes" if x else "No")
+        uploaded_file = st.file_uploader("Choose File", accept_multiple_files=True, type=["pdf", "docx", "txt", "doc", "log"])
         submitted = st.form_submit_button("Upload File", disabled=st.session_state.api_key_is_valid is False)
     if submitted and uploaded_file is not None:
-           
-        tempFilePath = os.path.join(temp_dir, uploaded_file.name)
-        with open(tempFilePath, "wb") as f:
-                f.write(uploaded_file.getvalue())       
-        print(f"Selected file: {tempFilePath}")
+        for i in range(len(uploaded_file)):
+                    
+            tempFilePath = os.path.join(temp_dir, uploaded_file[i].name)
+            with open(tempFilePath, "wb") as f:
+                    f.write(uploaded_file[i].getvalue())       
+            print(f"Selected file: {tempFilePath}")
 
-        loader = Loader(data_path)
-        collection_name = collection_name or os.path.basename(st.session_state.embedding_model_name)
-        with st.spinner(f"Uploading {uploaded_file.name} [{use_extractors}] to {collection_name}"):
-            loader.load(filePath=tempFilePath
+            loader = Loader(data_path)
+            collection_name = collection_name or os.path.basename(st.session_state.embedding_model_name)
+            with st.spinner(f"Uploading {uploaded_file[i].name} [{use_extractors}] to {collection_name}"):
+                loader.load(filePath=tempFilePath
                         , collectionName=generate_valid_collection_name(collection_name)
                         , embeddingModelName=st.session_state.embedding_model_name
                         , inferenceModelName=st.session_state.inference_model_name
@@ -97,7 +107,7 @@ def main():
                 st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
     st.divider()
 
-    query = st.text_input("Find similar text chunks and query LLM"
+    query = st.text_input("Find similar text chunks"
                           , key="txtFindText"
                           , placeholder="Enter text to search")
     result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
@@ -117,23 +127,35 @@ def main():
                                 , k = int(result_count)
                                 , dataframe=True)
     
+        st.session_state.result_df = result_df
+    
+    result_df = st.session_state.result_df if 'result_df' in st.session_state else None
+    if result_df is not None:
         st.dataframe(result_df, use_container_width=True)
         result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
         result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))
         result_df['page_label'] = pd.json_normalize(result_df['metadatas'])['page_label']
         st.table(result_df.groupby('file_name')['page_label'].apply(list).apply(set).apply(sorted))
-    
-        context = result_df['documents'].to_list() 
-        prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {query}"
         
-        with st.spinner("Thinking ..."):
-            llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=0.2, timeout=timeout)
-        
-        st.text_area(key="txtLlmResponse", label=query, value=llm_response)   
+    st.divider()
+    queryPrompt = st.text_input("Prompt LLM"
+                , key="txtPromptQuery"
+                , placeholder="Enter prompt for LLM")  
+    with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
+        submittedLLMSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
 
-def configure_settings():
-    if is_running_in_streamlit_cloud():
-        st.warning("Shared database for demo. Do not upload personal documents.")
+        if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
+            context = st.session_state.result_df['documents'].to_list() 
+            prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {queryPrompt}"
+            
+            with st.spinner("Thinking ..."):
+                llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=0.2, timeout=timeout)
+            
+            st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
+
+def configure_settings(demo_mode):
+    if demo_mode == "1":
+        st.warning("WARNING: Shared database for demo. Do not upload personal documents.")       
         st.sidebar.header("OpenAI Settings")
         key_choice = "OpenAI"
     else:
@@ -166,6 +188,14 @@ def configure_settings():
     st.session_state.api_url = api_url
     st.session_state.embedding_model_name = embedding_model_name
     st.session_state.inference_model_name = inference_model_name        
+
+def configure_demo_mode():
+    demo_mode = 0
+    if 'Bookshelf_Demo_Mode' in os.environ:
+        demo_mode = os.getenv('Bookshelf_Demo_Mode')
+    elif is_running_in_streamlit_cloud():
+            demo_mode = 1
+    st.session_state.demo_mode = demo_mode
 
 def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
     messages = [{"role": "user", "content": prompt}]
