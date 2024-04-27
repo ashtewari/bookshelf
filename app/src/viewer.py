@@ -7,7 +7,10 @@ from llama_index.embeddings.openai import OpenAIEmbedding
 
 class ChromaDb:
     def __init__(self, path):
-        self.client = chromadb.PersistentClient(path)
+        if path is None:
+            self.client = chromadb.EphemeralClient()
+        else:
+            self.client = chromadb.PersistentClient(path)
 
     ## get list of collections
     def get_collections(self) -> list[dict]:

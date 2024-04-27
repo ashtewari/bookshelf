@@ -48,7 +48,7 @@ class Loader:
             # Print the tensor
             print(tensor)      
 
-    def load(self, filePath, collectionName, embeddingModelName, inferenceModelName, apiKey, apiBaseUrl, useExtractors=False, temperature=0.1, timeout=30):   
+    def load(self, db, filePath, collectionName, embeddingModelName, inferenceModelName, apiKey, apiBaseUrl, useExtractors=False, temperature=0.1, timeout=30):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
         openai.api_key = apiKey
@@ -75,8 +75,8 @@ class Loader:
                 embed_batch_size=100,
                 device='cuda' if torch.cuda.is_available() else 'cpu'
                 )        
-        db = chromadb.PersistentClient(path=self.dbPath)
-        chroma_collection = db.get_or_create_collection(collectionName)
+        
+        chroma_collection = db.create_collection(collectionName)
 
         service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, transformations=transformations)
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)

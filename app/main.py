@@ -48,8 +48,8 @@ def main():
     collection_selected = st.session_state.collections if 'collections' in st.session_state else None
     collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
     
-    db = ChromaDb(data_path)    
-    db.client.create_collection(collection_name, get_or_create=True)
+    db = OpenDbConnection(data_path if st.session_state.demo_mode != "1" else None)    
+    db.create_collection(collection_name)
 
     uploaded_file = None
     submitted = False
@@ -74,7 +74,7 @@ def main():
             loader = Loader(data_path)
             collection_name = collection_name or os.path.basename(st.session_state.embedding_model_name)
             with st.spinner(f"Uploading {uploaded_file[i].name} [{use_extractors}] to {collection_name}"):
-                loader.load(filePath=tempFilePath
+                loader.load(db=db, filePath=tempFilePath
                         , collectionName=generate_valid_collection_name(collection_name)
                         , embeddingModelName=st.session_state.embedding_model_name
                         , inferenceModelName=st.session_state.inference_model_name
@@ -153,14 +153,16 @@ def main():
             
             st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
 
+@st.cache_resource
+def OpenDbConnection(data_path):
+    db = ChromaDb(data_path)
+    return db
+
 def configure_settings(demo_mode):
+    st.sidebar.header("Settings")
+    key_choice = st.sidebar.radio(key="rdOptions", label="Language Model", options=("OpenAI", "Local"), horizontal=True)
     if demo_mode == "1":
         st.warning("WARNING: Shared database for demo. Do not upload personal documents.")       
-        st.sidebar.header("OpenAI Settings")
-        key_choice = "OpenAI"
-    else:
-        key_choice = st.sidebar.radio(key="rdOptions", label="LLM Settings", options=("OpenAI", "Local"), horizontal=True)
-        
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
