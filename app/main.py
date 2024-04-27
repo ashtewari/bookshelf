@@ -160,10 +160,19 @@ def OpenDbConnection(data_path):
     return db
 
 def configure_settings(demo_mode):
+    if 'llm_options' in st.session_state:
+        llm_options = st.session_state.llm_options
+    else:
+        llm_options = ["OpenAI", "Local"]
+        st.session_state.llm_options = llm_options
+
     st.sidebar.header("Settings")
-    key_choice = st.sidebar.radio(key="rdOptions", label="Language Model", options=("OpenAI", "Local"), horizontal=True)
     if demo_mode == "1":
-        st.warning("WARNING: Shared database for demo. Do not upload personal documents.")       
+        st.warning("WARNING: Shared database for demo. Do not upload personal documents.") 
+    if is_running_in_streamlit_cloud():      
+        llm_options = ["OpenAI"]
+
+    key_choice = st.sidebar.radio(key="rdOptions", label="Language Model", options=llm_options, horizontal=True)
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
