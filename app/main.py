@@ -45,6 +45,7 @@ def main():
     if (data_path==""):
         st.error("Please provide a valid data path")
     
+    os.makedirs(data_path, exist_ok=True)
     collection_selected = st.session_state.collections if 'collections' in st.session_state else None
     collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
     
