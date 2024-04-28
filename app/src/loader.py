@@ -51,6 +51,8 @@ class Loader:
     def load(self, db, filePath, collectionName, embeddingModelName, inferenceModelName, apiKey, apiBaseUrl, useExtractors=False, temperature=0.1, timeout=30):   
 
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
+        
+        ## todo: extract openai initialization to a separate class
         openai.api_key = apiKey
         openai.api_base = apiBaseUrl
         openai.timeout = timeout
@@ -67,6 +69,7 @@ class Loader:
         ]                
         transformations = [text_splitter] + extractors if useExtractors else [text_splitter]
 
+        ## todo: extract embedding initialization to a separate class
         if (embeddingModelName == "OpenAIEmbedding"):
             embed_model = OpenAIEmbedding()
         else:
@@ -75,7 +78,7 @@ class Loader:
                 embed_batch_size=100,
                 device='cuda' if torch.cuda.is_available() else 'cpu'
                 )        
-        
+
         chroma_collection = db.create_collection(collectionName)
 
         service_context = ServiceContext.from_defaults(embed_model=embed_model, llm=llm, transformations=transformations)
