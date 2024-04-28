@@ -37,7 +37,7 @@ class ChromaDb:
         return {os.path.basename(x) for x in distinct_keys}
     
     ## query specified collection
-    def query(self, query_str, collection_name, apiKey, apiBaseUrl, embedding_model_name, timeout=30, k=3, dataframe=False):
+    def query(self, query_str, collection_name, apiKey, apiBaseUrl, embedding_model_name, timeout=30, n_result_count=3, dataframe=False):
         collection = self.client.get_collection(collection_name)
 
         openai.api_key = apiKey
@@ -50,7 +50,7 @@ class ChromaDb:
 
         embedding = embed_model.get_text_embedding(query_str)
         res = collection.query(
-            query_embeddings=[embedding], n_results=k
+            query_embeddings=[embedding], n_results=n_result_count
         )
         out = {}
         for key, value in res.items():

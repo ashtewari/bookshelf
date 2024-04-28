@@ -40,7 +40,7 @@ def main():
     data_path = app_user_data_path  
  
 
-    tabCollections, tabLoad, tabSearch, tabPrompt = st.tabs(["Collections", "Load", "Retrieve", "Prompt"])
+    tabCollections, tabLoad, tabRetrieve, tabPrompt = st.tabs(["Collections", "Load", "Retrieve", "Prompt"])
 
     with tabLoad:
         if(preferred_data_path is not None):
@@ -97,7 +97,7 @@ def main():
         collection_index = names.index(collection_name) if collection_name in names else 0
         col1, col2 = st.columns([1,3])
         with col1:
-            collection_selected=st.radio("Collections", key="collections",
+            collection_selected=st.radio("", key="collections",
                     options=collections, format_func=lambda x: x['name'],
                     index=collection_index,
                     )
@@ -112,9 +112,9 @@ def main():
                     file_names = db.get_file_names(collection_selected["name"])          
                     st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
 
-    with tabSearch:
+    with tabRetrieve:
 
-        query = st.text_input("Find similar text chunks"
+        query = st.text_area("Find similar text chunks"
                             , key="txtFindText"
                             , placeholder="Enter text to search")
         result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
@@ -131,7 +131,7 @@ def main():
                                     , apiBaseUrl=st.session_state.api_url
                                     , timeout=int(timeout)                                  
                                     , embedding_model_name=st.session_state.embedding_model_name 
-                                    , k = int(result_count)
+                                    , n_result_count = int(result_count)
                                     , dataframe=True)
         
             st.session_state.result_df = result_df
@@ -145,10 +145,12 @@ def main():
             st.table(result_df.groupby('file_name')['page_label'].apply(list).apply(set).apply(sorted))
     
     with tabPrompt:
-        queryPrompt = st.text_input("Prompt LLM"
+        queryPrompt = st.text_area("Prompt LLM"
                     , key="txtPromptQuery"
                     , placeholder="Enter prompt for LLM")  
+        
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
+            temperature = st.slider("Temperature", 0.0, 1.0, 0.1, format="%f")
             submittedLLMSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
@@ -156,7 +158,7 @@ def main():
                 prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {queryPrompt}"
                 
                 with st.spinner("Thinking ..."):
-                    llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=0.2, timeout=timeout)
+                    llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=temperature, timeout=timeout)
                 
                 st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
 
