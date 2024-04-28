@@ -130,7 +130,7 @@ def main():
                 result_count = 5  # Set a default value if result_count is empty
 
             with st.spinner(f"Searching for similar documents ..."):
-                result_df = db.query(query, collection_selected["name"]
+                result_df = db.query(query_str=query, collection_name=collection_selected["name"]
                                     , apiKey=st.session_state.api_key
                                     , apiBaseUrl=st.session_state.api_url
                                     , timeout=int(timeout)                                  
@@ -141,7 +141,7 @@ def main():
             st.session_state.result_df = result_df
         
         result_df = st.session_state.result_df if 'result_df' in st.session_state else None
-        if result_df is not None:
+        if result_df is not None and result_df.empty == False:
             st.dataframe(result_df, use_container_width=True)
             result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
             result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))
