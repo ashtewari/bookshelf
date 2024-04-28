@@ -343,6 +343,10 @@ if __name__ == "__main__":
             unsafe_allow_html=True,
         )
         st.markdown(
+            "<div style='margin-top: 0.75em;'><a href='https://github.com/ashtewari/bookshelf' target='_blank'><img src='https://img.shields.io/badge/View%20on%20GitHub-bookshelf-green.svg' alt='View on GitHub'/></a></div>",
+            unsafe_allow_html=True,
+        )        
+        st.markdown(
             "<div style='margin-top: 0.75em;'><a href='https://ko-fi.com/I2I7TTYTN' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Support this project' /></a></div>",
             unsafe_allow_html=True,
         )
