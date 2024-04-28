@@ -92,6 +92,7 @@ def main():
                             , useExtractors=use_extractors
                             , temperature=0.1 
                             , timeout=int(timeout))
+                    st.toast(f"Uploaded completed: {uploaded_file[i].name}")
                 os.remove(tempFilePath)
   
     with tabCollections:
@@ -150,12 +151,12 @@ def main():
     
     with tabPrompt:
         st.text(f"Selected Collection: {collection_selected['name']}")
+        if "result_df" not in st.session_state:
+            st.warning("Please perform a retrieval first to prepare context.")
+        
         queryPrompt = st.text_area("Prompt"
                     , key="txtPromptQuery"
                     , placeholder="Enter prompt for Language Model")  
-        
-        if "result_df" not in st.session_state:
-                st.warning("Please perform a retrieval first to prepare context.")
         
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
             temperature = st.slider("Temperature", 0.0, 1.0, 0.1, format="%f")
