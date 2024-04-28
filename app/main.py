@@ -222,6 +222,7 @@ def configure_settings(demo_mode):
     elif key_choice == "Local" and (api_key is None or api_key == ""):
         api_key = "not-set"
     
+    os.environ['OPENAI_API_KEY'] = api_key
     st.session_state.api_key = api_key
     st.session_state.api_url = api_url
     st.session_state.embedding_model_name = embedding_model_name
