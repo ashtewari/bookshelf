@@ -14,6 +14,7 @@ if platform.system() == 'Linux':
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 from src.vector_store import ChromaDb
 from src.loader import Loader
+import tiktoken
 
 load_dotenv(find_dotenv(), override=True) 
 
@@ -121,6 +122,7 @@ def main():
         query = st.text_area(f"Find similar text chunks"
                             , key="txtFindText"
                             , placeholder="Enter text to search")
+        st.text(f"token count: {num_tokens_from_string(query, st.session_state.inference_model_name)}")
         result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
         with st.form(key="frmQuery", clear_on_submit=True, border=False):
             submittedSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
@@ -163,15 +165,19 @@ def main():
 
         context = st.text_area("Context", key="txtContextArea", value=context_value)
         st.session_state.user_context = context
+        st.text(f"token count: {num_tokens_from_string(st.session_state.user_context, st.session_state.inference_model_name)}")
         
         queryPrompt = st.text_area("Prompt"
                     , key="txtPromptQuery"
                     , placeholder="Enter prompt for Language Model")  
+        st.text(f"token count: {num_tokens_from_string(queryPrompt, st.session_state.inference_model_name)}")
 
         promptTemplateDefault = "*** CONTEXT = {context} *** \n Based on the CONTEXT provided above, {prompt}"
         promptTemplate = st.text_area("Prompt Template", key="txtPromptTemplate", value=promptTemplateDefault)
         prompt = promptTemplate.format(context=context, prompt=queryPrompt)      
         print(f">>>> Prompt: {prompt}")
+
+        st.text(f"token count: {num_tokens_from_string(prompt, st.session_state.inference_model_name)}")
 
         temperature = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f")
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
@@ -188,6 +194,13 @@ def main():
 def OpenDbConnection(data_path):
     db = ChromaDb(data_path)
     return db
+
+def num_tokens_from_string(string: str, model_name: str) -> int:
+    if string is None or string == "":
+        return 0
+    encoding = tiktoken.encoding_for_model(model_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
 
 def configure_settings(demo_mode):
     if 'llm_options' in st.session_state:
