@@ -335,3 +335,14 @@ if __name__ == "__main__":
     sys.path.append(working_dir)
 
     main()
+
+    with st.sidebar:
+        st.divider()
+        st.markdown(
+            '<h6>Made in &nbsp<img src="https://streamlit.io/images/brand/streamlit-mark-color.png" alt="Streamlit logo" height="16">&nbsp by <a href="https://www.tewari.info/">Ash Tewari</a></h6>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            "<div style='margin-top: 0.75em;'><a href='https://ko-fi.com/I2I7TTYTN' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=3' border='0' alt='Support this project' /></a></div>",
+            unsafe_allow_html=True,
+        )
