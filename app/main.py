@@ -168,7 +168,9 @@ def main():
                     , key="txtPromptQuery"
                     , placeholder="Enter prompt for Language Model")  
 
-        prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {queryPrompt}"
+        promptTemplateDefault = "*** CONTEXT = {context} *** \n Based on the CONTEXT provided above, {prompt}"
+        promptTemplate = st.text_area("Prompt Template", key="txtPromptTemplate", value=promptTemplateDefault)
+        prompt = promptTemplate.format(context=context, prompt=queryPrompt)      
         print(f">>>> Prompt: {prompt}")
 
         temperature = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f")
