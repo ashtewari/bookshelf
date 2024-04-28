@@ -192,16 +192,15 @@ def main():
 
         st.text(f"token count: {num_tokens_from_string(prompt, st.session_state.inference_model_name)}")
 
-        temperature_for_inference = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f", key="tempInference")
-        llm_for_inference = llm.create_instance_for_inference( 
-                                    api_base=st.session_state.api_url, 
-                                    api_key=st.session_state.api_key, 
-                                    timeout=int(timeout))        
+        temperature_for_inference = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f", key="tempInference")       
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
             submittedLLMSearch = st.form_submit_button("Submit", disabled=st.session_state.api_key_is_valid is False)
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
-                
+                llm_for_inference = llm.create_instance_for_inference( 
+                                            api_base=st.session_state.api_url, 
+                                            api_key=st.session_state.api_key, 
+                                            timeout=int(timeout))                 
                 with st.spinner("Thinking ..."):
                     llm_response = get_completion(prompt, llm_for_inference, st.session_state.inference_model_name, temperature_for_inference)
                 
