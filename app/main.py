@@ -16,7 +16,6 @@ from src.vector_store import ChromaDb
 from src.loader import Loader
 
 load_dotenv(find_dotenv(), override=True) 
-# os.environ['OPENAI_API_KEY'] = ""
 
 def main():
     st.set_page_config(page_title="Bookshelf", page_icon="📚", layout="wide")
@@ -30,10 +29,10 @@ def main():
 
     preferred_data_path = None
     timeout = 30
-    if 'Bookshelf:PreferredDataPath' in os.environ:
-        preferred_data_path = os.environ['Bookshelf:PreferredDataPath']
-    if 'OPENAI_API_TIMEOUT' in os.environ:
-        timeout = os.getenv('OPENAI_API_TIMEOUT')        
+    if 'Bookshelf_PreferredDataPath' in os.environ:
+        preferred_data_path = os.environ['Bookshelf_PreferredDataPath']
+    if 'BOOKSHELF_LLM_API_TIMEOUT' in os.environ:
+        timeout = os.getenv('BOOKSHELF_LLM_API_TIMEOUT')        
 
     temp_dir = os.path.join("tmp", "bookshelf") 
     app_user_data_path = os.path.join(temp_dir, os.path.join("data", "db"))        
@@ -152,20 +151,31 @@ def main():
     with tabPrompt:
         st.text(f"Selected Collection: {collection_selected['name']}")
         if "result_df" not in st.session_state:
-            st.warning("Please perform a retrieval first to prepare context.")
+            st.warning("Please perform a retrieval first to prepare context from chunks.")
+        
+        context_value = st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else None
+        if "user_context" in st.session_state and st.session_state.user_context is not None and st.session_state.user_context != "":
+            context_value = st.session_state.user_context
+
+        if "result_df" in st.session_state:
+            if st.button("Load context from retrieved chunks", key="btnLoadContextFromChunks"):
+                context_value = st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else None
+
+        context = st.text_area("Context", key="txtContextArea", value=context_value)
+        st.session_state.user_context = context
         
         queryPrompt = st.text_area("Prompt"
                     , key="txtPromptQuery"
                     , placeholder="Enter prompt for Language Model")  
-        
-        with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
-            temperature = st.slider("Temperature", 0.0, 1.0, 0.1, format="%f")
 
-            submittedLLMSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False or "result_df" not in st.session_state)
+        prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {queryPrompt}"
+        print(f">>>> Prompt: {prompt}")
+
+        temperature = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f")
+        with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
+            submittedLLMSearch = st.form_submit_button("Submit", disabled=st.session_state.api_key_is_valid is False)
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
-                context = st.session_state.result_df['documents'].to_list() 
-                prompt = f"CONTEXT = {context} *** \n Based on the CONTEXT provided above, {queryPrompt}"
                 
                 with st.spinner("Thinking ..."):
                     llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=temperature, timeout=timeout)
@@ -203,7 +213,7 @@ def configure_settings(demo_mode):
         embedding_model_name = st.sidebar.text_input(key="txtEmbeddingModelName", label="Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value=embedding_model_name)
     
     api_url = st.sidebar.text_input(key="txtApiUrl", label="LLM API Url", placeholder="https://api.openai.com/v1", value=api_url_value)
-    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password")
+    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('BOOKSHELF_LLM_API_KEY'))
     
     st.session_state.api_key_is_valid = True
     if key_choice == "OpenAI" and (api_key is None or api_key == ""):
