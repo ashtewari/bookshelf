@@ -4,8 +4,7 @@ import os
 
 import torch
 import torch.cuda
-import openai
-import chromadb
+from openai import OpenAI
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core import SimpleDirectoryReader,ServiceContext        
@@ -14,7 +13,6 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.text_splitter import TokenTextSplitter
-from llama_index.core.ingestion import IngestionPipeline
 from llama_index.core.extractors import (
     SummaryExtractor,
     QuestionsAnsweredExtractor,
@@ -53,12 +51,12 @@ class Loader:
         book = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
         
         ## todo: extract openai initialization to a separate class
-        openai.api_key = apiKey
-        openai.api_base = apiBaseUrl
-        openai.timeout = timeout
-        openai.max_tokens = 1024
-        openai.temperature = temperature
-        llm = OpenAI(model_name=inferenceModelName)
+        llm = OpenAI(model=inferenceModelName, 
+                     api_base=apiBaseUrl, 
+                     api_key=apiKey, 
+                     max_tokens=1024, 
+                     temperature=temperature, 
+                     timeout=timeout)
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         extractors=[
@@ -71,7 +69,10 @@ class Loader:
 
         ## todo: extract embedding initialization to a separate class
         if (embeddingModelName == "OpenAIEmbedding"):
-            embed_model = OpenAIEmbedding()
+            embed_model = OpenAIEmbedding(api_base=apiBaseUrl, 
+                                          api_key=apiKey, 
+                                          timeout=timeout, 
+                                          embed_batch_size=100)
         else:
             embed_model = HuggingFaceEmbedding(
                 model_name=embeddingModelName,
