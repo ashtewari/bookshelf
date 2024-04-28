@@ -1,9 +1,6 @@
 import os
 import chromadb 
-import openai
 import pandas as pd
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.embeddings.openai import OpenAIEmbedding
 
 class ChromaDb:
     def __init__(self, path):
@@ -37,18 +34,10 @@ class ChromaDb:
         return {os.path.basename(x) for x in distinct_keys}
     
     ## query specified collection
-    def query(self, query_str, collection_name, apiKey, apiBaseUrl, embedding_model_name, timeout=30, n_result_count=3, dataframe=False):
-        collection = self.client.get_collection(collection_name)
+    def query(self, query_str, collection_name, embedding_model, n_result_count=3, dataframe=False):
+        collection = self.client.get_collection(collection_name)       
 
-        openai.api_key = apiKey
-        openai.api_base = apiBaseUrl
-        openai.timeout = timeout
-        if (embedding_model_name == "OpenAIEmbedding"):
-            embed_model = OpenAIEmbedding()
-        else:
-            embed_model = HuggingFaceEmbedding(model_name=embedding_model_name)         
-
-        embedding = embed_model.get_text_embedding(query_str)
+        embedding = embedding_model.get_text_embedding(query_str)
         res = collection.query(
             query_embeddings=[embedding], n_results=n_result_count
         )

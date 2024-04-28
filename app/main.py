@@ -14,7 +14,11 @@ if platform.system() == 'Linux':
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 from src.vector_store import ChromaDb
 from src.loader import Loader
+from src.llm_factory import llm
+from src.embedding_model_factory import EmbeddingModelFactory
 import tiktoken
+import torch
+import torch.cuda
 
 load_dotenv(find_dotenv(), override=True) 
 
@@ -26,7 +30,7 @@ def main():
     configure_demo_mode()
     print(f"Demo mode: {st.session_state.demo_mode}") 
 
-    configure_settings(st.session_state.demo_mode)
+    configure_settings()
 
     preferred_data_path = None
     timeout = 30
@@ -60,6 +64,7 @@ def main():
         db = OpenDbConnection(data_path if st.session_state.demo_mode != "1" else None)    
         db.create_collection(collection_name)
 
+        temperature_for_extraction = 0.1
         uploaded_file = None
         submitted = False
         use_extractors = False
@@ -68,7 +73,22 @@ def main():
                                     format_func=lambda x: "Yes" if x else "No")    
         if "rdUseExtractors" in st.session_state and st.session_state.rdUseExtractors == True:
             st.warning("WARNING: Metadata extraction uses LLM and may incur additional costs.") 
+            temperature_for_extraction = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f", key="tempExtraction")
         
+        llm_for_extraction = llm.create_instance_for_extraction(model=st.session_state.inference_model_name, 
+                                    api_base=st.session_state.api_url, 
+                                    api_key=st.session_state.api_key, 
+                                    max_tokens=1024, 
+                                    temperature=temperature_for_extraction, 
+                                    timeout=timeout)
+        
+        embedding_model = EmbeddingModelFactory.create_instance(model_name=st.session_state.embedding_model_name, 
+                                    api_base=st.session_state.api_url, 
+                                    api_key=st.session_state.api_key, 
+                                    cuda_is_available=check_cuda_availability(), 
+                                    embed_batch_size=100, 
+                                    timeout=timeout)
+                    
         with st.form("frmFileUploader", clear_on_submit=True):
             uploaded_file = st.file_uploader("Choose File", accept_multiple_files=True, type=["pdf", "docx", "txt", "doc", "log"])
             submitted = st.form_submit_button("Upload File", disabled=st.session_state.api_key_is_valid is False)
@@ -85,13 +105,9 @@ def main():
                 with st.spinner(f"Uploading {uploaded_file[i].name} to {collection_name}"):
                     loader.load(db=db, filePath=tempFilePath
                             , collectionName=generate_valid_collection_name(collection_name)
-                            , embeddingModelName=st.session_state.embedding_model_name
-                            , inferenceModelName=st.session_state.inference_model_name
-                            , apiKey=st.session_state.api_key
-                            , apiBaseUrl=st.session_state.api_url
-                            , useExtractors=use_extractors
-                            , temperature=0.1 
-                            , timeout=int(timeout))
+                            , embedding_model=embedding_model
+                            , llm=llm_for_extraction
+                            , useExtractors=use_extractors)
                     st.toast(f"Uploaded completed: {uploaded_file[i].name}")
                 os.remove(tempFilePath)
   
@@ -132,15 +148,12 @@ def main():
                 result_count = 5  # Set a default value if result_count is empty
 
             with st.spinner(f"Searching for similar documents ..."):
-                result_df = db.query(query_str=query, collection_name=collection_selected["name"]
-                                    , apiKey=st.session_state.api_key
-                                    , apiBaseUrl=st.session_state.api_url
-                                    , timeout=int(timeout)                                  
-                                    , embedding_model_name=st.session_state.embedding_model_name 
-                                    , n_result_count = int(result_count)
-                                    , dataframe=True)
-        
-            st.session_state.result_df = result_df
+                result_df = db.query(query_str=query,
+                                     collection_name=collection_selected["name"],
+                                     embedding_model=embedding_model,
+                                     n_result_count = int(result_count),
+                                     dataframe=True)
+                st.session_state.result_df = result_df
         
         result_df = st.session_state.result_df if 'result_df' in st.session_state else None
         if result_df is not None and result_df.empty == False:
@@ -179,14 +192,18 @@ def main():
 
         st.text(f"token count: {num_tokens_from_string(prompt, st.session_state.inference_model_name)}")
 
-        temperature = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f")
+        temperature_for_inference = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f", key="tempInference")
+        llm_for_inference = llm.create_instance_for_inference( 
+                                    api_base=st.session_state.api_url, 
+                                    api_key=st.session_state.api_key, 
+                                    timeout=int(timeout))        
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
             submittedLLMSearch = st.form_submit_button("Submit", disabled=st.session_state.api_key_is_valid is False)
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
                 
                 with st.spinner("Thinking ..."):
-                    llm_response = get_completion(prompt, model=st.session_state.inference_model_name, temperature=temperature, timeout=timeout)
+                    llm_response = get_completion(prompt, llm_for_inference, st.session_state.inference_model_name, temperature_for_inference)
                 
                 st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
 
@@ -202,7 +219,7 @@ def num_tokens_from_string(string: str, model_name: str) -> int:
     num_tokens = len(encoding.encode(string))
     return num_tokens
 
-def configure_settings(demo_mode):
+def configure_settings():
     if 'llm_options' in st.session_state:
         llm_options = st.session_state.llm_options
     else:
@@ -242,6 +259,24 @@ def configure_settings(demo_mode):
     st.session_state.embedding_model_name = embedding_model_name
     st.session_state.inference_model_name = inference_model_name        
 
+def check_cuda_availability():
+    # Check if CUDA is available
+    result = torch.cuda.is_available()
+    print(f'CUDA is available: {result}')
+    if result:
+        # Set the CUDA device
+        torch.cuda.set_device(0)
+
+        # Get the current device
+        device = torch.cuda.device(device=0)
+
+        # Create a tensor on the GPU
+        tensor = torch.tensor([1, 2, 3])
+
+        # Print the tensor
+        print(tensor)
+    return result
+
 def configure_demo_mode():
     demo_mode = 0
     if 'Bookshelf_Demo_Mode' in os.environ:
@@ -250,15 +285,17 @@ def configure_demo_mode():
             demo_mode = 1
     st.session_state.demo_mode = demo_mode
 
-def get_completion(prompt, model="gpt-3.5-turbo", temperature=0, timeout=30): 
+def get_completion(prompt, llm, model_name, temperature=0.1): 
     messages = [{"role": "user", "content": prompt}]
-    client = OpenAI(api_key = st.session_state.api_key)
-    client.base_url = st.session_state.api_url 
-    client.timeout = int(timeout)
-    response = client.chat.completions.create(
-        model=model,
+    response = llm.chat.completions.create(
+        model=model_name,
         messages=messages,
         temperature=temperature,
+        max_tokens=1024,
+        presence_penalty=0.0,
+        frequency_penalty=0.0,
+        n=1,
+        top_p=1.0,
     )
     return response.choices[0].message.content
 
