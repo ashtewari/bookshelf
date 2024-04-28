@@ -50,6 +50,10 @@ def main():
             st.error("Please provide a valid data path")
         
         os.makedirs(data_path, exist_ok=True)
+
+        if st.session_state.demo_mode == "1":
+            st.warning("WARNING: Shared database for demo. Do not upload personal documents.") 
+
         collection_selected = st.session_state.collections if 'collections' in st.session_state else None
         collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
         
@@ -113,8 +117,8 @@ def main():
                     st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
 
     with tabRetrieve:
-
-        query = st.text_area("Find similar text chunks"
+        st.text(f"Selected Collection: {collection_selected['name']}")
+        query = st.text_area(f"Find similar text chunks"
                             , key="txtFindText"
                             , placeholder="Enter text to search")
         result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
@@ -145,13 +149,18 @@ def main():
             st.table(result_df.groupby('file_name')['page_label'].apply(list).apply(set).apply(sorted))
     
     with tabPrompt:
-        queryPrompt = st.text_area("Prompt LLM"
+        st.text(f"Selected Collection: {collection_selected['name']}")
+        queryPrompt = st.text_area("Prompt"
                     , key="txtPromptQuery"
-                    , placeholder="Enter prompt for LLM")  
+                    , placeholder="Enter prompt for Language Model")  
+        
+        if "result_df" not in st.session_state:
+                st.warning("Please perform a retrieval first to prepare context.")
         
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
             temperature = st.slider("Temperature", 0.0, 1.0, 0.1, format="%f")
-            submittedLLMSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
+
+            submittedLLMSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False or "result_df" not in st.session_state)
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
                 context = st.session_state.result_df['documents'].to_list() 
@@ -174,9 +183,7 @@ def configure_settings(demo_mode):
         llm_options = ["OpenAI", "Local"]
         st.session_state.llm_options = llm_options
 
-    st.sidebar.header("Settings")
-    if demo_mode == "1":
-        st.warning("WARNING: Shared database for demo. Do not upload personal documents.") 
+    st.sidebar.title("Settings")
     if is_running_in_streamlit_cloud():      
         llm_options = ["OpenAI"]
 
