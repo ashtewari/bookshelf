@@ -18,6 +18,7 @@ from src.embedding_model_factory import EmbeddingModelFactory
 import tiktoken
 import torch
 import torch.cuda
+from src.langchain import llm_openai
 
 load_dotenv(find_dotenv(), override=True) 
 
@@ -197,7 +198,7 @@ def main():
 
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":                    
                 with st.spinner("Thinking ..."):
-                    llm_response = llm().execute_prompt(st.session_state.api_url, st.session_state.api_key, st.session_state.inference_model_name,int(timeout),prompt,temperature_for_inference)
+                    llm_response = llm_openai().execute_prompt(st.session_state.api_url, st.session_state.api_key, st.session_state.inference_model_name,int(timeout),prompt,temperature_for_inference)
                 
                 st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
 
