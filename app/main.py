@@ -4,7 +4,6 @@ import streamlit as st
 import uuid
 import re
 from dotenv import load_dotenv, find_dotenv
-from openai import OpenAI
 import pandas as pd
 import json
 import platform
@@ -75,7 +74,7 @@ def main():
             st.warning("WARNING: Metadata extraction uses LLM and may incur additional costs.") 
             temperature_for_extraction = st.slider("Temperature", 0.0, 2.0, 0.1, step=0.1, format="%f", key="tempExtraction")
         
-        llm_for_extraction = llm.create_instance_for_extraction(model=st.session_state.inference_model_name, 
+        llm_for_extraction = llm().create_instance_for_extraction(model=st.session_state.inference_model_name, 
                                     api_base=st.session_state.api_url, 
                                     api_key=st.session_state.api_key, 
                                     max_tokens=1024, 
@@ -196,13 +195,9 @@ def main():
         with st.form(key="frmPromptQuery", clear_on_submit=True, border=False):
             submittedLLMSearch = st.form_submit_button("Submit", disabled=st.session_state.api_key_is_valid is False)
 
-            if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":    
-                llm_for_inference = llm.create_instance_for_inference( 
-                                            api_base=st.session_state.api_url, 
-                                            api_key=st.session_state.api_key, 
-                                            timeout=int(timeout))                 
+            if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":                    
                 with st.spinner("Thinking ..."):
-                    llm_response = get_completion(prompt, llm_for_inference, st.session_state.inference_model_name, temperature_for_inference)
+                    llm_response = llm().execute_prompt(st.session_state.api_url, st.session_state.api_key, st.session_state.inference_model_name,int(timeout),prompt,temperature_for_inference)
                 
                 st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
 

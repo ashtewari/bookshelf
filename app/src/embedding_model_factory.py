@@ -1,5 +1,4 @@
 # embedding_model_factory.py
-import openai
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 
