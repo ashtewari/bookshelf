@@ -11,6 +11,7 @@ RUN pip install torch torchvision torchaudio --index-url https://download.pytorc
 
 # Copy the rest of the app's code
 COPY ./app /build
+COPY .streamlit /build/.streamlit
 
 # Expose port 8501 and run the app
 EXPOSE 8501
