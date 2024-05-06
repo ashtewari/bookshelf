@@ -8,7 +8,6 @@ class llm_openai:
 
     def execute_prompt(self, api_base, api_key, model_name, timeout, prompt, temperature):
         llm = ChatOpenAI(openai_api_base=f"{api_base}", openai_api_key=api_key, model=model_name, request_timeout=timeout) 
-        messages = [HumanMessage(content=[{"type": "text", "text": str(prompt)},])] 
         kwargs={
                 "temperature": temperature, 
                 "max_tokens": 1000,
@@ -17,11 +16,14 @@ class llm_openai:
                 "n":1,
                 "top_p":1.0                                    
                 }        
+        
         # using invoke method
-        response = llm.invoke(input=[messages,], **kwargs)
+        response = llm.invoke(input=[prompt,], **kwargs)
         return response.content
+        
         """
         # using generate method
+        messages = [HumanMessage(content=[{"type": "text", "text": str(prompt)},])] 
         response = llm.generate(messages=[messages], **kwargs)
         return response.generations[0][0].text 
         """  
