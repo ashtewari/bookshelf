@@ -20,6 +20,9 @@ import torch
 import torch.cuda
 from src.langchain import llm_openai
 
+print(f"TRANSFORMERS_CACHE: {os.getenv('TRANSFORMERS_CACHE', None)}")
+print(f"HF_HOME: {os.getenv('HF_HOME', None)}")
+
 load_dotenv(find_dotenv(), override=True) 
 
 def main():
@@ -32,12 +35,8 @@ def main():
 
     configure_settings()
 
-    preferred_data_path = None
-    timeout = 30
-    if 'Bookshelf_PreferredDataPath' in os.environ:
-        preferred_data_path = os.environ['Bookshelf_PreferredDataPath']
-    if 'BOOKSHELF_LLM_API_TIMEOUT' in os.environ:
-        timeout = os.getenv('BOOKSHELF_LLM_API_TIMEOUT')        
+    preferred_data_path = os.getenv('Bookshelf_PreferredDataPath', None)
+    timeout = os.getenv('BOOKSHELF_LLM_API_TIMEOUT', 30)        
 
     temp_dir = os.path.join("tmp", "bookshelf") 
     app_user_data_path = os.path.join(temp_dir, os.path.join("data", "db"))        
