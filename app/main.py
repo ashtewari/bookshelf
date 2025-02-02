@@ -19,6 +19,10 @@ import tiktoken
 import torch
 import torch.cuda
 from src.langchain import llm_openai
+from deepeval.test_case import LLMTestCase
+from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
+from deepeval import evaluate
+
 
 print(f"TRANSFORMERS_CACHE: {os.getenv('TRANSFORMERS_CACHE', None)}")
 print(f"HF_HOME: {os.getenv('HF_HOME', None)}")
@@ -43,7 +47,7 @@ def main():
     data_path = app_user_data_path  
  
 
-    tabCollections, tabLoad, tabRetrieve, tabPrompt = st.tabs(["Collections", "Load", "Retrieve", "Prompt"])
+    tabCollections, tabLoad, tabRetrieve, tabPrompt, tabEval = st.tabs(["Collections", "Load", "Retrieve", "Prompt", "Eval"])
 
     with tabLoad:
         if(preferred_data_path is not None):
@@ -198,8 +202,60 @@ def main():
             if submittedLLMSearch and queryPrompt is not None and queryPrompt != "":                    
                 with st.spinner("Thinking ..."):
                     llm_response = llm_openai().execute_prompt(st.session_state.api_url, st.session_state.api_key, st.session_state.inference_model_name,int(timeout),prompt,temperature_for_inference)
-                
+                    st.session_state.llm_response = llm_response
                 st.text_area(key="txtLlmResponse", label=queryPrompt, value=llm_response)   
+
+    with tabEval:
+        st.text(f"Selected Collection: {collection_selected['name']}")
+        if "result_df" not in st.session_state:
+            st.warning("Please perform a retrieval first to prepare context from chunks.")
+            
+        expected_output = st.text_area("Expected Output", 
+                                     key="txtExpectedOutput",
+                                     placeholder="Enter the expected output for evaluation")
+        
+        expected_context = st.text_area("Expected Context", 
+                                     key="txtExpectedContext",
+                                     placeholder="Enter the expected context for evaluation")
+        
+        if st.button("Start Evaluation", 
+                    key="btnStartEval",
+                    disabled=st.session_state.api_key_is_valid is False or "result_df" not in st.session_state):
+            st.info("Evaluation started...")
+
+            # Set OpenAI API key for deepeval
+            os.environ["OPENAI_API_KEY"] = st.session_state.api_key
+            
+            # Configure deepeval to use the specified API base if not using OpenAI
+            if st.session_state.api_url != "https://api.openai.com/v1":
+                os.environ["OPENAI_API_BASE"] = st.session_state.api_url
+
+            test_case = LLMTestCase(
+                input=queryPrompt,
+                expected_output=expected_output,
+                actual_output=st.session_state.llm_response,
+                context=[expected_context],
+                retrieval_context=st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else [None]
+            )
+
+            try:
+                answer_relevancy = AnswerRelevancyMetric(0.7)
+                faithfulness = FaithfulnessMetric(0.7)
+                contextual_relevancy = ContextualRelevancyMetric(0.7)
+
+                results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy])
+                # Create DataFrame
+                df_eval_results = pd.DataFrame([result.model_dump() for result in results.test_results[0].metrics_data])
+
+                # Select only relevant columns
+                df_filtered_eval_results = df_eval_results[['name', 'success', 'reason']]
+
+                # Display in Streamlit
+                st.dataframe(df_filtered_eval_results)  # Allows sorting, filtering, and scrolling
+
+            except Exception as e:
+                st.error(f"Evaluation failed: {str(e)}")
+                st.info("Note: Make sure you're using OpenAI API for evaluation as deepeval currently only supports OpenAI.")
 
 @st.cache_resource
 def OpenDbConnection(data_path):
@@ -209,9 +265,13 @@ def OpenDbConnection(data_path):
 def num_tokens_from_string(string: str, model_name: str) -> int:
     if string is None or string == "":
         return 0
-    encoding = tiktoken.encoding_for_model(model_name)
+    if model_name == "gpt-4o":
+        encoding = tiktoken.get_encoding("cl100k_base")
+    else:
+        encoding = tiktoken.encoding_for_model(model_name)
     num_tokens = len(encoding.encode(string))
     return num_tokens
+
 
 def configure_settings():
     if 'llm_options' in st.session_state:
@@ -228,7 +288,7 @@ def configure_settings():
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
-    inference_model_name = "gpt-3.5-turbo"
+    inference_model_name = "gpt-4o-mini"
     
     if key_choice == "OpenAI":
         embedding_model_name = "OpenAIEmbedding"
