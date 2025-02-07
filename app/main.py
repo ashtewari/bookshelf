@@ -177,7 +177,7 @@ def main():
 
         if "result_df" in st.session_state:
             if st.button("Load context from retrieved chunks", key="btnLoadContextFromChunks"):
-                context_value = st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else None
+                context_value = '\n\n'.join(st.session_state.result_df['documents'].to_list()).replace('\\n', '\n')
 
         context = st.text_area("Context", key="txtContextArea", value=context_value)
         st.session_state.user_context = context
@@ -235,13 +235,13 @@ def main():
                 expected_output=expected_output,
                 actual_output=st.session_state.llm_response,
                 context=[expected_context],
-                retrieval_context=st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else [None]
+                retrieval_context= '\n\n'.join(st.session_state.result_df['documents'].to_list()).replace('\\n', '\n').splitlines() if "result_df" in st.session_state else [None]
             )
 
             try:
-                answer_relevancy = AnswerRelevancyMetric(0.7)
-                faithfulness = FaithfulnessMetric(0.7)
-                contextual_relevancy = ContextualRelevancyMetric(0.7)
+                answer_relevancy = AnswerRelevancyMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
+                faithfulness = FaithfulnessMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
+                contextual_relevancy = ContextualRelevancyMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
 
                 results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy])
                 # Create DataFrame
