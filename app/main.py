@@ -157,13 +157,14 @@ def main():
                                      n_result_count = int(result_count),
                                      dataframe=True)
                 st.session_state.result_df = result_df
+                st.session_state.prompt_value = query
         
         result_df = st.session_state.result_df if 'result_df' in st.session_state else None
         if result_df is not None and result_df.empty == False:
             st.dataframe(result_df, use_container_width=True)
             result_df['metadatas'] = result_df['metadatas'].apply(lambda x: json.dumps(x) if not isinstance(x, dict) else x)
             result_df['file_name'] = pd.json_normalize(result_df['metadatas'])['file_name'].apply(lambda x: os.path.basename(x))
-            result_df['page_label'] = pd.json_normalize(result_df['metadatas'])['page_label']
+            result_df['page_label'] = pd.json_normalize(result_df['metadatas']).get('page_label', 1)
             st.table(result_df.groupby('file_name')['page_label'].apply(list).apply(set).apply(sorted))
     
     with tabPrompt:
@@ -183,9 +184,13 @@ def main():
         st.session_state.user_context = context
         st.text(f"token count: {num_tokens_from_string(st.session_state.user_context, st.session_state.inference_model_name)}")
         
+        prompt_value = ""
+        if "prompt_value" in st.session_state and st.session_state.prompt_value is not None and st.session_state.prompt_value != "":
+            prompt_value = st.session_state.prompt_value        
+        
         queryPrompt = st.text_area("Prompt"
                     , key="txtPromptQuery"
-                    , placeholder="Enter prompt for Language Model")  
+                    , placeholder="Enter prompt for Language Model", value=prompt_value)  
         st.text(f"token count: {num_tokens_from_string(queryPrompt, st.session_state.inference_model_name)}")
 
         promptTemplateDefault = "*** CONTEXT = {context} *** \n Based on the CONTEXT provided above, {prompt}"
@@ -288,7 +293,7 @@ def configure_settings():
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
-    inference_model_name = "gpt-4o-mini"
+    inference_model_name = "gpt-3.5-turbo"
     
     if key_choice == "OpenAI":
         embedding_model_name = "OpenAIEmbedding"
