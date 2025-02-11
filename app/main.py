@@ -89,7 +89,8 @@ def main():
                                     api_base=st.session_state.api_url, 
                                     api_key=st.session_state.api_key, 
                                     cuda_is_available=check_cuda_availability(), 
-                                    embed_batch_size=100, 
+                                    embed_batch_size=100,
+                                    max_length=512,
                                     timeout=timeout)
                     
         with st.form("frmFileUploader", clear_on_submit=True):
