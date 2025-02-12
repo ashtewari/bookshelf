@@ -294,7 +294,7 @@ def configure_settings():
 
     api_url = "http://localhost:1234/v1"
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
-    inference_model_name = "gpt-3.5-turbo"
+    inference_model_name = "gpt-4o-mini"
     
     if key_choice == "OpenAI":
         embedding_model_name = "OpenAIEmbedding"

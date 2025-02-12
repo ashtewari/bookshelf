@@ -12,20 +12,24 @@ class ChromaDb:
     ## get list of collections
     def get_collections(self) -> list[dict]:
         collections = []
-
-        for i in self.client.list_collections():
-            collections.append({"name": i.name, "count": i.count()})
+        collection_names = self.client.list_collections()
+        for name in collection_names:
+            collection = self.client.get_collection(name)
+            collections.append({"name": name, "count": collection.count()})
         
         return collections
     
     ## get documents in specified collection
     def get_collection_data(self, collection_name, dataframe=False, limit=10):
         collection = self.client.get_collection(name=collection_name)
-        count = collection.count()
         data = collection.get(limit=limit, offset=0)
+
+        # following lines are to handle None values in the data, chromadb started retruning non-aligned arrays - this is a workaround
+        cleaned_data = {key: (value if value is not None else []) for key, value in data.items()}
         if dataframe:
-            return pd.DataFrame(data)
-        return data
+            df = pd.DataFrame.from_dict(cleaned_data, orient='index')
+            return df.transpose()
+        return cleaned_data
     
     def get_file_names(self, collection_name):
         collection = self.client.get_collection(name=collection_name)
