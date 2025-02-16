@@ -109,7 +109,7 @@ def main():
                 with st.spinner(f"Uploading {uploaded_file[i].name} to {collection_name}"):
                     loader.load(db=db, filePath=tempFilePath
                             , collectionName=generate_valid_collection_name(collection_name)
-                            , embedding_model=embedding_model
+                            , embedding_model_requested=embedding_model
                             , llm=llm_for_extraction
                             , useExtractors=use_extractors)
                     st.toast(f"Uploaded completed: {uploaded_file[i].name}")
@@ -132,7 +132,10 @@ def main():
                 limit = st.slider('Chunks', 1, collection_selected["count"], 10, )
                 with st.spinner(f"Loading {collection_selected}..."):
                     df = db.get_collection_data(collection_selected["name"], dataframe=True, limit=limit)
-                    st.dataframe(df, use_container_width=True, height=300) 
+                    # Add embedding model column if not present
+                    if 'embedding_model' not in df.columns:
+                        df['embedding_model'] = df['metadatas'].apply(lambda x: x.get('embedding_model', 'unknown') if x else 'unknown')
+                    st.dataframe(df, use_container_width=True, height=300)
                 with st.spinner(f"Loading {collection_selected}..."):
                     file_names = db.get_file_names(collection_selected["name"])          
                     st.dataframe(file_names, use_container_width=True, column_config={'value': st.column_config.TextColumn(label='Files')}) 
@@ -154,7 +157,7 @@ def main():
             with st.spinner(f"Searching for similar documents ..."):
                 result_df = db.query(query_str=query,
                                      collection_name=collection_selected["name"],
-                                     embedding_model=embedding_model,
+                                     embedding_model_requested=embedding_model,
                                      n_result_count = int(result_count),
                                      dataframe=True)
                 st.session_state.result_df = result_df

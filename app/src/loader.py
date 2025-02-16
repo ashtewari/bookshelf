@@ -15,6 +15,7 @@ from llama_index.core.extractors import (
 from llama_index.node_parser.docling import DoclingNodeParser
 from llama_index.readers.docling import DoclingReader
 from llama_index.core import Settings
+from src.embedding_model_factory import EmbeddingModelFactory
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -26,11 +27,21 @@ class Loader:
     def __init__(self, dbPath):
         self.dbPath = dbPath
 
-    def load(self, db, filePath, collectionName, embedding_model, llm, useExtractors=False):   
+    def load(self, db, filePath, collectionName, embedding_model_requested, llm, useExtractors=False):   
 
         reader = DoclingReader(export_type=DoclingReader.ExportType.JSON)
         node_parser = DoclingNodeParser()
         docs = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True, file_extractor={"*.*": reader},).load_data()
+
+        # Get all unique embedding models used in this collection
+        collection_data = db.get_collection_data(collectionName)
+        embedding_model = EmbeddingModelFactory.get_embedding_model(collection_data, embedding_model_requested)
+
+        # Add embedding model info to document metadata
+        for doc in docs:
+            if not doc.metadata:
+                doc.metadata = {}
+            doc.metadata["embedding_model"] = embedding_model.model_name
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         extractors=[

@@ -1,9 +1,10 @@
 import os
 import chromadb 
 import pandas as pd
+from src.embedding_model_factory import EmbeddingModelFactory
 
 class ChromaDb:
-    def __init__(self, path):
+    def __init__(self, path=None):
         if path is None:
             self.client = chromadb.EphemeralClient()
         else:
@@ -38,12 +39,18 @@ class ChromaDb:
         return {os.path.basename(x) for x in distinct_keys}
     
     ## query specified collection
-    def query(self, query_str, collection_name, embedding_model, n_result_count=3, dataframe=False):
-        collection = self.client.get_collection(collection_name)       
+    def query(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
+        collection = self.client.get_collection(collection_name)
+        
+        # Get all unique embedding models used in this collection
+        embedding_model = EmbeddingModelFactory.get_embedding_model(collection, embedding_model_requested)
 
-        embedding = embedding_model.get_text_embedding(query_str)
+        # Generate embeddings for the query
+        query_embedding = embedding_model.get_text_embedding(query_str)
+        
+        # Query the collection
         res = collection.query(
-            query_embeddings=[embedding], n_results=n_result_count
+            query_embeddings=[query_embedding], n_results=n_result_count
         )
         out = {}
         for key, value in res.items():
