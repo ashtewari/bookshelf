@@ -4,8 +4,7 @@ import os
 
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.core import SimpleDirectoryReader,ServiceContext        
-from llama_index.core import StorageContext
+from llama_index.core import SimpleDirectoryReader, StorageContext
 from llama_index.core.text_splitter import TokenTextSplitter
 from llama_index.core.extractors import (
     SummaryExtractor,
@@ -13,6 +12,9 @@ from llama_index.core.extractors import (
     TitleExtractor,
     KeywordExtractor,
 )
+from llama_index.node_parser.docling import DoclingNodeParser
+from llama_index.readers.docling import DoclingReader
+from llama_index.core import Settings
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -26,7 +28,9 @@ class Loader:
 
     def load(self, db, filePath, collectionName, embedding_model, llm, useExtractors=False):   
 
-        docs = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True).load_data()
+        reader = DoclingReader(export_type=DoclingReader.ExportType.JSON)
+        node_parser = DoclingNodeParser()
+        docs = SimpleDirectoryReader(input_files=[filePath], filename_as_id=True, file_extractor={"*.*": reader},).load_data()
 
         text_splitter = TokenTextSplitter(separator=" ", chunk_size=512, chunk_overlap=20)
         extractors=[
@@ -35,12 +39,16 @@ class Loader:
             ,SummaryExtractor(summaries=["self"], llm=llm, num_workers=1) #let's extract the summary for both previous node and current node.
             ,KeywordExtractor(keywords=10, llm=llm, num_workers=1) #let's extract 10 keywords for each node.
         ]                
-        transformations = [text_splitter] + extractors if useExtractors else [text_splitter]
+        transformations = [node_parser] + extractors if useExtractors else [text_splitter]
 
         chroma_collection = db.create_collection(collectionName)
 
-        service_context = ServiceContext.from_defaults(embed_model=embedding_model, llm=llm, transformations=transformations)
+        # Update Settings instead of using ServiceContext
+        Settings.embed_model = embedding_model
+        Settings.llm = llm
+        Settings.transformations = transformations
+
         vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context, service_context=service_context)
+        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context)
         print(index)        
