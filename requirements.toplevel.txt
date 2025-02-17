@@ -1,0 +1,12 @@
+chromadb==0.6.3
+deepeval==2.2.6
+langchain_core==0.3.35
+langchain_openai==0.3.6
+llama_index==0.12.17
+pandas==2.2.3
+python-dotenv==1.0.1
+setuptools==69.1.1
+streamlit==1.31.1
+tiktoken==0.8.0
+torch==2.6.0
+pysqlite3-binary; sys_platform == "linux"
