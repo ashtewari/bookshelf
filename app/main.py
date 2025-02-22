@@ -22,6 +22,7 @@ from src.langchain import llm_openai
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
 from deepeval import evaluate
+from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy
 
 
 print(f"TRANSFORMERS_CACHE: {os.getenv('TRANSFORMERS_CACHE', None)}")
@@ -67,6 +68,51 @@ def main():
         db = OpenDbConnection(data_path if st.session_state.demo_mode != "1" else None)    
         db.create_collection(collection_name)
 
+        with st.container(border=True):
+            
+            chunking_strategy_options = {
+                "Token Text Splitter": TokenTextSplitterStrategy(),
+                "Sentence Splitter": SentenceSplitterStrategy(),
+            }
+            
+            selected_chunking_strategy = st.radio(
+                "Select Chunking Strategy",
+                options=list(chunking_strategy_options.keys()),
+                format_func=lambda x: x,
+                horizontal=True
+            )
+
+            # Create a container with a border for configuration options
+            with st.container():
+                
+                # Show configuration options for selected chunking strategy
+                current_strategy = chunking_strategy_options[selected_chunking_strategy]
+                config_options = current_strategy.get_config_options()
+                new_config = {}
+                
+                # Create columns for configuration options
+                cols = st.columns(len(config_options))
+                for i, (option_name, option_config) in enumerate(config_options.items()):
+                    with cols[i]:
+                        if "options" in option_config:
+                            new_value = st.selectbox(
+                                option_name,
+                                options=option_config["options"],
+                                index=option_config["options"].index(option_config["value"])
+                            )
+                        else:
+                            new_value = st.number_input(
+                                option_name,
+                                min_value=option_config["min"],
+                                max_value=option_config["max"],
+                                value=option_config["value"],
+                                step=option_config["step"]
+                            )
+                        new_config[option_name] = new_value
+            
+            # Update the strategy configuration
+            current_strategy.update_config(new_config)
+
         temperature_for_extraction = 0.1
         uploaded_file = None
         submitted = False
@@ -105,6 +151,9 @@ def main():
                 print(f"Selected file: {tempFilePath}")
 
                 loader = Loader(data_path)
+                # Set the selected transformer strategy
+                loader.set_transformer_strategy(chunking_strategy_options[selected_chunking_strategy])
+                
                 collection_name = collection_name or os.path.basename(st.session_state.embedding_model_name)
                 with st.spinner(f"Uploading {uploaded_file[i].name} to {collection_name}"):
                     loader.load(db=db, filePath=tempFilePath
