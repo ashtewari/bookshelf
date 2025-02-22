@@ -22,7 +22,7 @@ from src.langchain import llm_openai
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
 from deepeval import evaluate
-from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy
+from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy, HierarchicalNodeParserStrategy
 
 
 print(f"TRANSFORMERS_CACHE: {os.getenv('TRANSFORMERS_CACHE', None)}")
@@ -73,6 +73,7 @@ def main():
             chunking_strategy_options = {
                 "Token Text Splitter": TokenTextSplitterStrategy(),
                 "Sentence Splitter": SentenceSplitterStrategy(),
+                "Hierarchical Node Parser": HierarchicalNodeParserStrategy(),
             }
             
             selected_chunking_strategy = st.radio(
@@ -94,13 +95,25 @@ def main():
                 cols = st.columns(len(config_options))
                 for i, (option_name, option_config) in enumerate(config_options.items()):
                     with cols[i]:
+                        # If options exist, use a selectbox
                         if "options" in option_config:
                             new_value = st.selectbox(
                                 option_name,
                                 options=option_config["options"],
                                 index=option_config["options"].index(option_config["value"])
                             )
+                        # If the default value is a list, handle it as comma-separated integers
+                        elif isinstance(option_config["value"], list):
+                            st.write(f"Enter comma-separated list for '{option_name}':")
+                            default_str = ", ".join(map(str, option_config["value"]))
+                            new_value_str = st.text_input(option_name, value=default_str)
+                            try:
+                                new_value = [int(x.strip()) for x in new_value_str.split(",") if x.strip()]
+                            except ValueError:
+                                st.warning("Please enter a comma-separated list of integers.")
+                                new_value = option_config["value"]
                         else:
+                            # Otherwise use number_input
                             new_value = st.number_input(
                                 option_name,
                                 min_value=option_config["min"],
@@ -108,6 +121,7 @@ def main():
                                 value=option_config["value"],
                                 step=option_config["step"]
                             )
+
                         new_config[option_name] = new_value
             
             # Update the strategy configuration

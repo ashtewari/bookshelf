@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from llama_index.core.text_splitter import TokenTextSplitter, SentenceSplitter
+from llama_index.core.node_parser import HierarchicalNodeParser
 from llama_index.node_parser.docling import DoclingNodeParser
 from llama_index.core.extractors import (
     SummaryExtractor,
@@ -70,6 +71,34 @@ class SentenceSplitterStrategy(ChunkingStrategy):
     def update_config(self, config):
         self.chunk_size = config.get("chunk_size", self.chunk_size)
         self.chunk_overlap = config.get("chunk_overlap", self.chunk_overlap)
+
+class HierarchicalNodeParserStrategy(ChunkingStrategy):
+    def __init__(self, chunk_sizes=[512, 256, 128]):
+        self.chunk_sizes = chunk_sizes
+
+    def get_transformation(self, llm=None):
+        # Ensure chunk_sizes is a list and has at least one value
+        if not isinstance(self.chunk_sizes, list):
+            self.chunk_sizes = [self.chunk_sizes]
+        
+        # Sort chunk sizes in descending order and create text splitters
+        chunk_sizes = sorted(self.chunk_sizes, reverse=True)
+        if not chunk_sizes:
+            chunk_sizes = [512]  # Default if empty
+
+        # Create the hierarchical parser with the text splitters
+        node_parser = HierarchicalNodeParser.from_defaults(
+            chunk_sizes=self.chunk_sizes
+        )
+        return [node_parser]
+    
+    def get_config_options(self):
+        return {
+            "chunk_sizes": {"value": self.chunk_sizes, "min": 64, "max": 6400, "step": 64},
+        }
+    
+    def update_config(self, config):
+        self.chunk_sizes = config.get("chunk_sizes", self.chunk_sizes)
 
 class DoclingNodeParserStrategy(ChunkingStrategy):
     def __init__(self, num_workers=1):
