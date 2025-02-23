@@ -88,7 +88,7 @@ class HierarchicalNodeParserStrategy(ChunkingStrategy):
 
         # Create the hierarchical parser with the text splitters
         node_parser = HierarchicalNodeParser.from_defaults(
-            chunk_sizes=[512,256,128] ##self.chunk_sizes
+            chunk_sizes=self.chunk_sizes
         )
         return [node_parser]
     

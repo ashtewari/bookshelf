@@ -3,14 +3,18 @@ import chromadb
 import pandas as pd
 from src.embedding_model_factory import EmbeddingModelFactory
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core import StorageContext, VectorStoreIndex, Settings
 from llama_index.core.retrievers import AutoMergingRetriever
+from llama_index.core.schema import Node, NodeRelationship
 
 class ChromaDb:
     def __init__(self, path=None):
         if path is None:
+            self.dbPath = None
             self.client = chromadb.EphemeralClient()
         else:
+            self.dbPath = path
             self.client = chromadb.PersistentClient(path)
 
     ## get list of collections
@@ -28,7 +32,7 @@ class ChromaDb:
         collection = self.client.get_collection(name=collection_name)
         data = collection.get(limit=limit, offset=0)
 
-        # following lines are to handle None values in the data, chromadb started retruning non-aligned arrays - this is a workaround
+        # following lines are to handle None values in the data, chromadb started returning non-aligned arrays - this is a workaround
         cleaned_data = {key: (value if value is not None else []) for key, value in data.items()}
         if dataframe:
             df = pd.DataFrame.from_dict(cleaned_data, orient='index')
@@ -43,17 +47,29 @@ class ChromaDb:
     
     def query_vector_store_index(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
         Settings.embed_model = embedding_model_requested
+        docstore_path = os.path.join(self.dbPath, "../docstore")
+        storage_context = StorageContext.from_defaults(persist_dir=docstore_path)        
         index = self.get_vector_store_index(collection_name)
+        
+        print(f"Total docs in docstore: {len(storage_context.docstore.docs)}")
+        
         base_retriever = index.as_retriever(similarity_top_k=n_result_count)
-        auto_merging_retriever = AutoMergingRetriever(base_retriever, index.storage_context, verbose=True)
+        auto_merging_retriever = AutoMergingRetriever(
+            base_retriever, 
+            storage_context,
+            verbose=True
+        )
+        
+        ## todo - an exception here crashes the app
         retrieved_nodes = auto_merging_retriever.retrieve(query_str)
+
         out = {}
         out['documents'] = [node.text for node in retrieved_nodes]
         out['distances'] = [node.score for node in retrieved_nodes]
         out['metadatas'] = [node.metadata for node in retrieved_nodes]
         if dataframe:
             return pd.DataFrame(out)
-        return out        
+        return out
 
         
     ## query specified collection
@@ -89,8 +105,31 @@ class ChromaDb:
     def get_vector_store_index(self, collection_name):
         collection = self.client.get_collection(name=collection_name)
         vector_store = ChromaVectorStore(chroma_collection=collection)
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_vector_store(vector_store=vector_store, storage_context=storage_context)
-        return index    
+
+        ## self._write_collection_metadata(collection.get(), collection.name)
+        
+        # Create index with all nodes
+        index = VectorStoreIndex.from_vector_store(
+            vector_store=vector_store
+        )
+        
+        return index        
+
+    def _write_collection_metadata(self, collection_data, collection_name):
+        """Write document IDs and metadata from a collection to a text file.
+        
+        Args:
+            collection_data: Dictionary containing collection documents and metadata
+            collection_name: Name of the collection to use in output filename
+        """
+        for i, doc_id in enumerate(collection_data.get('ids', [])):
+            metadata = collection_data.get('metadatas', [])[i] or {}
+            # Write doc ID and metadata to text file  
+            with open(f"{collection_name}_nodes.txt", "a") as f:
+                f.write(f"Document ID: {doc_id}\n")
+                f.write("Metadata:\n")
+                for key, value in metadata.items():
+                    f.write(f"  {key}: {value}\n")
+                f.write("\n")  # Add blank line between entries
     
     

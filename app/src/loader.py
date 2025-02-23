@@ -4,6 +4,7 @@ import os
 
 from llama_index.core import VectorStoreIndex
 from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core import SimpleDirectoryReader, StorageContext
 from llama_index.core.text_splitter import TokenTextSplitter
 from llama_index.core.extractors import (
@@ -88,13 +89,31 @@ class Loader:
             transformations = extractors
             Settings.transformations = transformations
 
+            # Get all nodes including the hierarchy
             all_nodes = node_parser[0].get_nodes_from_documents(docs)
             leaf_nodes = get_leaf_nodes(all_nodes)
             root_nodes = get_root_nodes(all_nodes)
+            
             vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            docstore_path = os.path.join(self.dbPath, "../docstore")
+            os.makedirs(docstore_path, exist_ok=True)
             storage_context = StorageContext.from_defaults(vector_store=vector_store)
-            storage_context.docstore.add_documents(all_nodes)
-            index = VectorStoreIndex(leaf_nodes, storage_context=storage_context)
+
+            # First add ALL nodes to docstore using add_documents
+            storage_context.docstore.add_documents(all_nodes, allow_update=True)
+            storage_context.persist(persist_dir=docstore_path)
+            
+            # Then create index with leaf nodes
+            index = VectorStoreIndex(
+                nodes=leaf_nodes,
+                storage_context=storage_context,
+                show_progress=True
+            )
+            
+            # Verify nodes are stored
+            print(f"Total nodes in docstore: {len(storage_context.docstore.docs)}")
+            print(f"Leaf nodes: {len(leaf_nodes)}")
+            print(f"Root nodes: {len(root_nodes)}")
         else:
             transformations = node_parser + extractors
             Settings.transformations = transformations
