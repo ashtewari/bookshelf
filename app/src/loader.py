@@ -97,7 +97,15 @@ class Loader:
             vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
             docstore_path = os.path.join(self.dbPath, "../docstore")
             os.makedirs(docstore_path, exist_ok=True)
-            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            
+            # Load existing docstore if it exists
+            if os.path.exists(os.path.join(docstore_path, "docstore.json")):
+                storage_context = StorageContext.from_defaults(
+                    vector_store=vector_store,
+                    persist_dir=docstore_path
+                )
+            else:
+                storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
             # First add ALL nodes to docstore using add_documents
             storage_context.docstore.add_documents(all_nodes, allow_update=True)
