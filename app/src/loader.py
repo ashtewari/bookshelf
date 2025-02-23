@@ -16,7 +16,9 @@ from llama_index.node_parser.docling import DoclingNodeParser
 from llama_index.readers.docling import DoclingReader
 from llama_index.core import Settings
 from src.embedding_model_factory import EmbeddingModelFactory
-from src.chunking_strategy import TokenTextSplitterStrategy, DoclingNodeParserStrategy
+from src.chunking_strategy import TokenTextSplitterStrategy, DoclingNodeParserStrategy, HierarchicalNodeParserStrategy, SemanticSplitterNodeParserStrategy
+from llama_index.core.node_parser import HierarchicalNodeParser, SemanticSplitterNodeParser
+from llama_index.core.node_parser import get_leaf_nodes, get_root_nodes
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 logging.getLogger().addHandler(logging.StreamHandler(stream=sys.stdout))
@@ -60,9 +62,14 @@ class Loader:
             doc.metadata["embedding_model"] = embedding_model.model_name
 
         # Get base transformations (chunking) from strategy
-        transformations = self.chunking_strategy.get_transformation(llm)
+        node_parser = None
+        if isinstance(self.chunking_strategy, SemanticSplitterNodeParserStrategy):
+            node_parser = self.chunking_strategy.get_transformation(llm, embedding_model)
+        else:
+            node_parser = self.chunking_strategy.get_transformation(llm)
 
         # Optionally add extractors for any strategy
+        extractors = []
         if useExtractors:
             extractors = [
                 TitleExtractor(nodes=1, llm=llm, num_workers=1),
@@ -70,16 +77,29 @@ class Loader:
                 SummaryExtractor(summaries=["self"], llm=llm, num_workers=1),
                 KeywordExtractor(keywords=10, llm=llm, num_workers=1),
             ]
-            transformations += extractors
 
         chroma_collection = db.create_collection(collectionName)
 
         # Update Settings instead of using ServiceContext
         Settings.embed_model = embedding_model
         Settings.llm = llm
-        Settings.transformations = transformations
 
-        vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        index = VectorStoreIndex.from_documents(docs, storage_context=storage_context)
+        if isinstance(self.chunking_strategy, HierarchicalNodeParserStrategy):
+            transformations = extractors
+            Settings.transformations = transformations
+
+            all_nodes = node_parser[0].get_nodes_from_documents(docs)
+            leaf_nodes = get_leaf_nodes(all_nodes)
+            root_nodes = get_root_nodes(all_nodes)
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            storage_context.docstore.add_documents(all_nodes)
+            index = VectorStoreIndex(leaf_nodes, storage_context=storage_context)
+        else:
+            transformations = node_parser + extractors
+            Settings.transformations = transformations
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+            index = VectorStoreIndex.from_documents(docs, storage_context=storage_context)
+        
         print(index)        

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from llama_index.core.text_splitter import TokenTextSplitter, SentenceSplitter
-from llama_index.core.node_parser import HierarchicalNodeParser
+from llama_index.core.node_parser import HierarchicalNodeParser, SemanticSplitterNodeParser
 from llama_index.node_parser.docling import DoclingNodeParser
 from llama_index.core.extractors import (
     SummaryExtractor,
@@ -88,7 +88,7 @@ class HierarchicalNodeParserStrategy(ChunkingStrategy):
 
         # Create the hierarchical parser with the text splitters
         node_parser = HierarchicalNodeParser.from_defaults(
-            chunk_sizes=self.chunk_sizes
+            chunk_sizes=[512,256,128] ##self.chunk_sizes
         )
         return [node_parser]
     
@@ -115,3 +115,28 @@ class DoclingNodeParserStrategy(ChunkingStrategy):
     
     def update_config(self, config):
         self.num_workers = config.get("num_workers", self.num_workers) 
+
+# SemanticSplitterNodeParser   
+class SemanticSplitterNodeParserStrategy(ChunkingStrategy):
+    def __init__(self, buffer_size=1, breakpoint_percentile_threshold=80):
+        self.buffer_size = buffer_size
+        self.breakpoint_percentile_threshold = breakpoint_percentile_threshold
+        self.embed_model = None
+
+    def get_transformation(self, llm=None, embed_model=None):
+        node_parser = SemanticSplitterNodeParser(
+            buffer_size=self.buffer_size,
+            breakpoint_percentile_threshold=self.breakpoint_percentile_threshold,
+            embed_model=embed_model
+        )
+        return [node_parser]
+    
+    def get_config_options(self):
+        return {
+            "buffer_size": {"value": self.buffer_size, "min": 1, "max": 10, "step": 1},
+            "breakpoint_percentile_threshold": {"value": self.breakpoint_percentile_threshold, "min": 1, "max": 100, "step": 1}
+        }
+    
+    def update_config(self, config):
+        self.buffer_size = config.get("buffer_size", self.buffer_size)
+        self.breakpoint_percentile_threshold = config.get("breakpoint_percentile_threshold", self.breakpoint_percentile_threshold)

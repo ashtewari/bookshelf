@@ -22,7 +22,7 @@ from src.langchain import llm_openai
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
 from deepeval import evaluate
-from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy, HierarchicalNodeParserStrategy
+from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy, HierarchicalNodeParserStrategy, SemanticSplitterNodeParserStrategy
 
 
 print(f"TRANSFORMERS_CACHE: {os.getenv('TRANSFORMERS_CACHE', None)}")
@@ -73,6 +73,7 @@ def main():
             chunking_strategy_options = {
                 "Token Text Splitter": TokenTextSplitterStrategy(),
                 "Sentence Splitter": SentenceSplitterStrategy(),
+                "Semantic Splitter": SemanticSplitterNodeParserStrategy(),
                 "Hierarchical Node Parser": HierarchicalNodeParserStrategy(),
             }
             
@@ -218,7 +219,7 @@ def main():
                 result_count = 5  # Set a default value if result_count is empty
 
             with st.spinner(f"Searching for similar documents ..."):
-                result_df = db.query(query_str=query,
+                result_df = db.query_vector_store_index(query_str=query,
                                      collection_name=collection_selected["name"],
                                      embedding_model_requested=embedding_model,
                                      n_result_count = int(result_count),

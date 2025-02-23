@@ -2,6 +2,9 @@ import os
 import chromadb 
 import pandas as pd
 from src.embedding_model_factory import EmbeddingModelFactory
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core import StorageContext, VectorStoreIndex, Settings
+from llama_index.core.retrievers import AutoMergingRetriever
 
 class ChromaDb:
     def __init__(self, path=None):
@@ -38,8 +41,23 @@ class ChromaDb:
         distinct_keys = set([x.get('file_name') for x  in all_metadatas])
         return {os.path.basename(x) for x in distinct_keys}
     
+    def query_vector_store_index(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
+        Settings.embed_model = embedding_model_requested
+        index = self.get_vector_store_index(collection_name)
+        base_retriever = index.as_retriever(similarity_top_k=n_result_count)
+        auto_merging_retriever = AutoMergingRetriever(base_retriever, index.storage_context, verbose=True)
+        retrieved_nodes = auto_merging_retriever.retrieve(query_str)
+        out = {}
+        out['documents'] = [node.text for node in retrieved_nodes]
+        out['distances'] = [node.score for node in retrieved_nodes]
+        out['metadatas'] = [node.metadata for node in retrieved_nodes]
+        if dataframe:
+            return pd.DataFrame(out)
+        return out        
+
+        
     ## query specified collection
-    def query(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
+    def query_collection(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
         collection = self.client.get_collection(collection_name)
         
         # Get all unique embedding models used in this collection
@@ -67,3 +85,12 @@ class ChromaDb:
 
     def create_collection(self, collectionName):  
         return self.client.get_or_create_collection(collectionName)  
+    
+    def get_vector_store_index(self, collection_name):
+        collection = self.client.get_collection(name=collection_name)
+        vector_store = ChromaVectorStore(chroma_collection=collection)
+        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        index = VectorStoreIndex.from_vector_store(vector_store=vector_store, storage_context=storage_context)
+        return index    
+    
+    
