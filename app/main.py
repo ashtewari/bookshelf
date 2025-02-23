@@ -52,7 +52,7 @@ def main():
 
     with tabLoad:
         if(preferred_data_path is not None):
-            data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=preferred_data_path)
+            data_path = st.text_input("Data Path", placeholder="Full path to database directory", value=os.path.join(preferred_data_path, "db"))
         
         if (data_path==""):
             st.error("Please provide a valid data path")
@@ -66,7 +66,8 @@ def main():
         collection_name = st.text_input("Collection Name", key="specified_collection_name", value=collection_selected["name"] if collection_selected else "default")
         
         db = OpenDbConnection(data_path if st.session_state.demo_mode != "1" else None)    
-        db.create_collection(collection_name)
+        if collection_name == "default":
+            db.create_collection(collection_name)
 
         with st.container(border=True):
             
@@ -158,6 +159,9 @@ def main():
             uploaded_file = st.file_uploader("Choose File", accept_multiple_files=True, type=["pdf", "docx", "txt", "doc", "log"])
             submitted = st.form_submit_button("Upload File", disabled=st.session_state.api_key_is_valid is False)
         if submitted and uploaded_file is not None:
+            # Create collection only when actually uploading files
+            db.create_collection(collection_name)
+            
             for i in range(len(uploaded_file)):
                         
                 tempFilePath = os.path.join(temp_dir, uploaded_file[i].name)
