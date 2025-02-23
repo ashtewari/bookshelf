@@ -73,7 +73,7 @@ class SentenceSplitterStrategy(ChunkingStrategy):
         self.chunk_overlap = config.get("chunk_overlap", self.chunk_overlap)
 
 class HierarchicalNodeParserStrategy(ChunkingStrategy):
-    def __init__(self, chunk_sizes=[512, 256, 128]):
+    def __init__(self, chunk_sizes=[1024, 512, 256]):
         self.chunk_sizes = chunk_sizes
 
     def get_transformation(self, llm=None):

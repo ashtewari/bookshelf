@@ -238,7 +238,7 @@ def main():
     with tabPrompt:
         st.text(f"Selected Collection: {collection_selected['name']}")
         if "result_df" not in st.session_state:
-            st.warning("Please perform a retrieval first to prepare context from chunks.")
+            st.warning("Please perform a retrieval to prepare context from chunks.")
         
         context_value = st.session_state.result_df['documents'].to_list() if "result_df" in st.session_state else None
         if "user_context" in st.session_state and st.session_state.user_context is not None and st.session_state.user_context != "":
@@ -281,7 +281,7 @@ def main():
     with tabEval:
         st.text(f"Selected Collection: {collection_selected['name']}")
         if "result_df" not in st.session_state:
-            st.warning("Please perform a retrieval first to prepare context from chunks.")
+            st.warning("Please perform a retrieval to prepare context from chunks.")
             
         expected_output = st.text_area("Expected Output", 
                                      key="txtExpectedOutput",
