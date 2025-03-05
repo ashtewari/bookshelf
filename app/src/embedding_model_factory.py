@@ -11,6 +11,7 @@ class EmbeddingModelFactory:
         if (model_name == "OpenAIEmbedding"):
             embed_model = OpenAIEmbedding(api_base=api_base, 
                                           api_key=api_key, 
+                                          model="text-embedding-3-small",
                                           timeout=timeout, 
                                           embed_batch_size=embed_batch_size)
         else:
