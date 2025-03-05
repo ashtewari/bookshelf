@@ -21,7 +21,9 @@ import torch.cuda
 from src.langchain import llm_openai
 from deepeval.test_case import LLMTestCase
 from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
+from deepeval.metrics.ragas import RagasMetric
 from deepeval import evaluate
+from deepeval.models import DeepEvalBaseLLM
 from src.chunking_strategy import TokenTextSplitterStrategy, SentenceSplitterStrategy, HierarchicalNodeParserStrategy, SemanticSplitterNodeParserStrategy
 
 
@@ -48,7 +50,7 @@ def main():
     data_path = app_user_data_path  
  
 
-    tabCollections, tabLoad, tabRetrieve, tabPrompt, tabEval = st.tabs(["Collections", "Load", "Retrieve", "Prompt", "Eval"])
+    tabCollections, tabLoad, tabRetrieve, tabPrompt, tabEval = st.tabs(["Collections", "Load", "Retrieve", "Generate", "Eval"])
 
     with tabLoad:
         if(preferred_data_path is not None):
@@ -284,20 +286,23 @@ def main():
 
     with tabEval:
         st.text(f"Selected Collection: {collection_selected['name']}")
+        st.info("Make sure you're using OpenAI API for evaluation")
         if "result_df" not in st.session_state:
-            st.warning("Please perform a retrieval to prepare context from chunks.")
-            
+            st.warning("Missing Retrieval Context for evaluation. Complete previous steps.")
+        if "llm_response" not in st.session_state:
+            st.warning("Missing LLM Response for evaluation. Complete previous steps.")
+
+        expected_context = st.text_area("Expected Context", 
+                                key="txtExpectedContext",
+                                placeholder="Enter the expected context for evaluation")
+        
         expected_output = st.text_area("Expected Output", 
                                      key="txtExpectedOutput",
                                      placeholder="Enter the expected output for evaluation")
         
-        expected_context = st.text_area("Expected Context", 
-                                     key="txtExpectedContext",
-                                     placeholder="Enter the expected context for evaluation")
-        
         if st.button("Start Evaluation", 
                     key="btnStartEval",
-                    disabled=st.session_state.api_key_is_valid is False or "result_df" not in st.session_state):
+                    disabled=st.session_state.api_key_is_valid is False):
             st.info("Evaluation started...")
 
             # Set OpenAI API key for deepeval
@@ -310,17 +315,55 @@ def main():
             test_case = LLMTestCase(
                 input=queryPrompt,
                 expected_output=expected_output,
-                actual_output=st.session_state.llm_response,
+                actual_output=st.session_state.llm_response if "llm_response" in st.session_state else None,
                 context=[expected_context],
-                retrieval_context= '\n\n'.join(st.session_state.result_df['documents'].to_list()).replace('\\n', '\n').splitlines() if "result_df" in st.session_state else [None]
+                retrieval_context= '\n\n'.join(st.session_state.result_df['documents'].to_list()).replace('\\n', '\n').splitlines() if "result_df" in st.session_state else ["None"]
             )
 
             try:
-                answer_relevancy = AnswerRelevancyMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
-                faithfulness = FaithfulnessMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
-                contextual_relevancy = ContextualRelevancyMetric(threshold=0.7, model=st.session_state.inference_model_name, include_reason=True)
+                # Create custom DeepEval LLM
+                class CustomLLM(DeepEvalBaseLLM):
+                    def __init__(self):
+                        self.api_key = st.session_state.api_key
+                        self.api_base = st.session_state.api_url
+                        self.model_name = st.session_state.inference_model_name
+                        
+                    def load_model(self):
+                        # Not loading a local model, just returning None
+                        return None
+                        
+                    def generate(self, prompt: str) -> str:
+                        # Use your existing llm_openai implementation
+                        return llm_openai().execute_prompt(
+                            self.api_base, 
+                            self.api_key, 
+                            self.model_name, 
+                            timeout=30,
+                            prompt=prompt,
+                            temperature=0.1  # Lower temperature for evaluation
+                        )
+                    
+                    async def a_generate(self, prompt: str) -> str:
+                        # Reuse the synchronous method for simplicity
+                        return self.generate(prompt)
+                    
+                    def get_model_name(self):
+                        return self.model_name
 
-                results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy])
+                # Create instance of custom LLM
+                custom_model = CustomLLM()
+
+                if st.session_state.selected_llm == "OpenAI":
+                    custom_model = st.session_state.inference_model_name
+                
+                # Use the custom model for evaluations
+                answer_relevancy = AnswerRelevancyMetric(threshold=0.7, model=custom_model, include_reason=True)
+                faithfulness = FaithfulnessMetric(threshold=0.7, model=custom_model, include_reason=True)
+                contextual_relevancy = ContextualRelevancyMetric(threshold=0.7, model=custom_model, include_reason=True)
+                
+                # Run evaluation
+                results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy], max_concurrent=5)
+                
                 # Create DataFrame
                 df_eval_results = pd.DataFrame([result.model_dump() for result in results.test_results[0].metrics_data])
 
@@ -332,7 +375,7 @@ def main():
 
             except Exception as e:
                 st.error(f"Evaluation failed: {str(e)}")
-                st.info("Note: Make sure you're using OpenAI API for evaluation as deepeval currently only supports OpenAI.")
+
 
 @st.cache_resource
 def OpenDbConnection(data_path):
@@ -342,10 +385,13 @@ def OpenDbConnection(data_path):
 def num_tokens_from_string(string: str, model_name: str) -> int:
     if string is None or string == "":
         return 0
-    if model_name == "gpt-4o":
+    if model_name == "gpt-4o" or model_name.startswith("together_ai"):
         encoding = tiktoken.get_encoding("cl100k_base")
     else:
-        encoding = tiktoken.encoding_for_model(model_name)
+        try:
+            encoding = tiktoken.encoding_for_model(model_name)
+        except:
+            encoding = tiktoken.get_encoding("cl100k_base")
     num_tokens = len(encoding.encode(string))
     return num_tokens
 
@@ -364,6 +410,7 @@ def configure_settings():
     key_choice = st.sidebar.radio(key="rdOptions", label="Language Model", options=llm_options, horizontal=True)
 
     api_url = "http://localhost:1234/v1"
+    api_key_value = os.getenv('BOOKSHELF_LLM_API_KEY')
     embedding_model_name = "sentence-transformers/all-mpnet-base-v2"
     inference_model_name = "gpt-4o-mini"
     
@@ -372,11 +419,17 @@ def configure_settings():
         api_url_value = "https://api.openai.com/v1"
         inference_model_name = st.sidebar.text_input(key="txtInferenceModelName", label="Model Name", value=inference_model_name)               
     elif key_choice == "Local":
-        api_url_value = "http://localhost:1234/v1"
+        api_url_value = os.getenv('BOOKSHELF_LOCAL_API_BASE')
+        api_key_value = os.getenv('BOOKSHELF_LOCAL_API_KEY')
+        inference_model_name = os.getenv('BOOKSHELF_LOCAL_MODEL_NAME')
+        if api_url_value is None or api_url_value == "":
+            api_url_value = "http://localhost:1234/v1"
+
         embedding_model_name = st.sidebar.text_input(key="txtEmbeddingModelName", label="Embedding Model Name", placeholder="sentence-transformers/all-MiniLM-L6-v2", value=embedding_model_name)
+        inference_model_name = st.sidebar.text_input(key="txtInferenceModelName", label="Inference Model Name", placeholder="meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", value=inference_model_name)
     
     api_url = st.sidebar.text_input(key="txtApiUrl", label="LLM API Url", placeholder="https://api.openai.com/v1", value=api_url_value)
-    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=os.getenv('BOOKSHELF_LLM_API_KEY'))
+    api_key = st.sidebar.text_input(key="txtApiKey", label="API Key", type="password", value=api_key_value)
     
     st.session_state.api_key_is_valid = True
     if key_choice == "OpenAI" and (api_key is None or api_key == ""):
@@ -385,10 +438,14 @@ def configure_settings():
     elif key_choice == "Local" and (api_key is None or api_key == ""):
         api_key = "not-set"
     
-    st.session_state.api_key = api_key
+    st.session_state.selected_llm = key_choice
     st.session_state.api_url = api_url
+    st.session_state.api_key = api_key
+    st.session_state.inference_model_name = inference_model_name   
     st.session_state.embedding_model_name = embedding_model_name
-    st.session_state.inference_model_name = inference_model_name        
+    
+    os.environ["OPENAI_API_KEY"] = st.session_state.api_key     
+    os.environ["OPENAI_API_BASE"] = st.session_state.api_url
 
 def check_cuda_availability():
     # Check if CUDA is available
