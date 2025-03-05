@@ -20,7 +20,7 @@ import torch
 import torch.cuda
 from src.langchain import llm_openai
 from deepeval.test_case import LLMTestCase
-from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric
+from deepeval.metrics import AnswerRelevancyMetric, FaithfulnessMetric, ContextualRelevancyMetric, ContextualPrecisionMetric, ContextualRecallMetric, HallucinationMetric
 from deepeval.metrics.ragas import RagasMetric
 from deepeval import evaluate
 from deepeval.models import DeepEvalBaseLLM
@@ -360,9 +360,12 @@ def main():
                 answer_relevancy = AnswerRelevancyMetric(threshold=0.7, model=custom_model, include_reason=True)
                 faithfulness = FaithfulnessMetric(threshold=0.7, model=custom_model, include_reason=True)
                 contextual_relevancy = ContextualRelevancyMetric(threshold=0.7, model=custom_model, include_reason=True)
+                contextual_precision = ContextualPrecisionMetric(threshold=0.7, model=custom_model, include_reason=True)
+                contextual_recall = ContextualRecallMetric(threshold=0.7, model=custom_model, include_reason=True)
+                hallucination = HallucinationMetric(threshold=0.7, model=custom_model, include_reason=True)                
                 
                 # Run evaluation
-                results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy], max_concurrent=5)
+                results = evaluate([test_case], [answer_relevancy, faithfulness, contextual_relevancy, contextual_precision, contextual_recall, hallucination], max_concurrent=5)
                 
                 # Create DataFrame
                 df_eval_results = pd.DataFrame([result.model_dump() for result in results.test_results[0].metrics_data])
