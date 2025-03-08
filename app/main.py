@@ -182,14 +182,20 @@ def main():
                             , embedding_model_requested=embedding_model
                             , llm=llm_for_extraction
                             , useExtractors=use_extractors)
+                    # Update the modified_at timestamp after loading the document
+                    db.update_collection_modified_timestamp(generate_valid_collection_name(collection_name))
                     st.toast(f"Uploaded completed: {uploaded_file[i].name}")
                 os.remove(tempFilePath)
   
     with tabCollections:
         with st.spinner("Loading collections..."):
             collections = db.get_collections()
+            collections = sorted(collections, 
+                              key=lambda x: (x.get("modified_at", 0), x.get("created_at", 0), x.get("name", "").lower()), 
+                              reverse=True)
+
         names = [d['name'] for d in collections]
-        collection_index = names.index(collection_name) if collection_name in names else 0
+        collection_index = names.index(names[0]) if collection_name in names else 0
         col1, col2 = st.columns([1,3])
         with col1:
             collection_selected=st.radio("", key="collections",

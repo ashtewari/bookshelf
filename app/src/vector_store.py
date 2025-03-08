@@ -1,4 +1,5 @@
 import os
+import time
 import chromadb 
 import pandas as pd
 from src.embedding_model_factory import EmbeddingModelFactory
@@ -23,7 +24,12 @@ class ChromaDb:
         collection_names = self.client.list_collections()
         for name in collection_names:
             collection = self.client.get_collection(name)
-            collections.append({"name": name, "count": collection.count()})
+            collection_data = {"name": name, "count": collection.count()}
+            
+            for field in ['created_at', 'modified_at']:
+                collection_data[field] = collection.metadata.get(field, 0) if collection.metadata else 0
+            
+            collections.append(collection_data)
         
         return collections
     
@@ -100,7 +106,17 @@ class ChromaDb:
         self.client.delete_collection(name=collection_name)
 
     def create_collection(self, collectionName):  
-        return self.client.get_or_create_collection(collectionName)  
+        timestamp = time.time()
+        return self.client.get_or_create_collection(collectionName, metadata={"created_at": timestamp, "modified_at": timestamp})  
+    
+    def update_collection_modified_timestamp(self, collection_name):
+        """Update the modified_at timestamp for a collection to the current time"""
+        collection = self.client.get_collection(name=collection_name)
+        current_metadata = collection.metadata or {}
+        # Preserve created_at and other metadata while updating modified_at
+        updated_metadata = {**current_metadata, "modified_at": time.time()}
+        collection.modify(metadata=updated_metadata)
+        return collection
     
     def get_vector_store_index(self, collection_name):
         collection = self.client.get_collection(name=collection_name)
@@ -131,5 +147,16 @@ class ChromaDb:
                 for key, value in metadata.items():
                     f.write(f"  {key}: {value}\n")
                 f.write("\n")  # Add blank line between entries
+    
+    def get_collection_metadata(self, collection_name):
+        try:
+            collection = self.client.get_collection(name=collection_name)
+            metadata = collection.metadata
+            if metadata is None:
+                metadata = {}
+            return metadata
+        except Exception as e:
+            print(f"Error getting metadata for collection {collection_name}: {e}")
+            return {}
     
     
