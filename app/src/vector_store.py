@@ -9,6 +9,7 @@ from llama_index.core import StorageContext, VectorStoreIndex, Settings
 from llama_index.core.retrievers import AutoMergingRetriever
 from llama_index.core.schema import Node, NodeRelationship, QueryBundle
 from llama_index.core.postprocessor import SentenceTransformerRerank
+from llama_index.postprocessor.flag_embedding_reranker import FlagEmbeddingReranker
 
 class ChromaDb:
     def __init__(self, path=None):
@@ -77,6 +78,15 @@ class ChromaDb:
 
             query_bundle = QueryBundle(query_str=query_str)
             ranked_nodes = reranker.postprocess_nodes(retrieved_nodes, query_bundle = query_bundle)
+        
+        elif reranker and reranker.startswith("BAAI"):
+            reranker = FlagEmbeddingReranker(
+                model=reranker, top_n=n_result_count
+            )
+
+            query_bundle = QueryBundle(query_str=query_str)
+            ranked_nodes = reranker.postprocess_nodes(retrieved_nodes, query_bundle = query_bundle)
+
         else:
             # If not using reranker, just take the top n_result_count nodes
             ranked_nodes = retrieved_nodes[:n_result_count]

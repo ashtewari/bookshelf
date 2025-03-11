@@ -223,7 +223,22 @@ def main():
                             , placeholder="Enter text to search")
         st.text(f"token count: {num_tokens_from_string(query, st.session_state.inference_model_name)}")
         result_count = st.number_input("Number of chunks to find", value=5, format='%d', step=1)
-        reranker = st.text_input("Reranker", value="cross-encoder/ms-marco-MiniLM-L-2-v2")
+        
+        reranker = None
+        with st.container(border=True):
+            use_reranker = st.toggle("Use Reranker", value=True)
+            if use_reranker:
+                reranker_options = [
+                    "cross-encoder/ms-marco-MiniLM-L-2-v2",
+                    "BAAI/bge-reranker-large"
+                ]
+                reranker = st.radio(
+                    "Choose a Reranker model (cross-encoder or bge models only)",
+                    options= reranker_options + ["Custom"],
+                    index=0
+                )
+                if reranker == "Custom":
+                    reranker = st.text_input("Custom reranker model name")
         
         with st.form(key="frmQuery", clear_on_submit=True, border=False):
             submittedSearch = st.form_submit_button("Search", disabled=st.session_state.api_key_is_valid is False)
@@ -238,7 +253,7 @@ def main():
                                      embedding_model_requested=embedding_model,
                                      n_result_count = int(result_count),
                                      dataframe=True,
-                                     reranker=reranker)
+                                     reranker=reranker if use_reranker else None)
                 st.session_state.result_df = result_df
                 st.session_state.prompt_value = query
         
