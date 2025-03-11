@@ -7,7 +7,8 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.core import StorageContext, VectorStoreIndex, Settings
 from llama_index.core.retrievers import AutoMergingRetriever
-from llama_index.core.schema import Node, NodeRelationship
+from llama_index.core.schema import Node, NodeRelationship, QueryBundle
+from llama_index.core.postprocessor import SentenceTransformerRerank
 
 class ChromaDb:
     def __init__(self, path=None):
@@ -51,7 +52,7 @@ class ChromaDb:
         distinct_keys = set([x.get('file_name') for x  in all_metadatas])
         return {os.path.basename(x) for x in distinct_keys}
     
-    def query_vector_store_index(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False):
+    def query_vector_store_index(self, query_str, collection_name, embedding_model_requested, n_result_count=3, dataframe=False, reranker=None):
         Settings.embed_model = embedding_model_requested
         docstore_path = os.path.join(self.dbPath, "../docstore")
         storage_context = StorageContext.from_defaults(persist_dir=docstore_path)        
@@ -59,7 +60,7 @@ class ChromaDb:
         
         print(f"Total docs in docstore: {len(storage_context.docstore.docs)}")
         
-        base_retriever = index.as_retriever(similarity_top_k=n_result_count)
+        base_retriever = index.as_retriever(similarity_top_k=n_result_count*2)
         auto_merging_retriever = AutoMergingRetriever(
             base_retriever, 
             storage_context,
@@ -68,11 +69,22 @@ class ChromaDb:
         
         ## todo - an exception here crashes the app
         retrieved_nodes = auto_merging_retriever.retrieve(query_str)
+        
+        if reranker and reranker.startswith("cross-encoder"):
+            reranker = SentenceTransformerRerank(
+                model=reranker, top_n=n_result_count
+            )
+
+            query_bundle = QueryBundle(query_str=query_str)
+            ranked_nodes = reranker.postprocess_nodes(retrieved_nodes, query_bundle = query_bundle)
+        else:
+            # If not using reranker, just take the top n_result_count nodes
+            ranked_nodes = retrieved_nodes[:n_result_count]
 
         out = {}
-        out['documents'] = [node.text for node in retrieved_nodes]
-        out['distances'] = [node.score for node in retrieved_nodes]
-        out['metadatas'] = [node.metadata for node in retrieved_nodes]
+        out['documents'] = [node.text for node in ranked_nodes]
+        out['distances'] = [node.score for node in ranked_nodes]
+        out['metadatas'] = [node.metadata for node in ranked_nodes]
         if dataframe:
             return pd.DataFrame(out)
         return out
